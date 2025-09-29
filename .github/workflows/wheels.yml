@@ -136,7 +136,9 @@ jobs:
       #     to copy two libgfortran libraries into the wheel, and falls over. This
       #     necessitates using install_name_tool on the scipy_openblas32 dylibs.
       #     The libraries are also built with an older version of gfortran (11), which
-      #     requires installation of that version.
+      #     requires installation of that version. Whilst this version is available
+      #     from homebrew, it doesn't come with an old enough deployment target.
+      #     We therefore have to jump through hoops to install a pre-packaged compiler.
       - name: Setup macOS
         if: startsWith( matrix.buildplat[0], 'macos-' )
         run: |
