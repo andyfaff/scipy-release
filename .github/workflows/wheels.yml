@@ -141,23 +141,23 @@ jobs:
             {delocate_archs} -w {dest_dir} {wheel} && echo "-----------" &&\
             delocate-listdeps -d {dest_dir}/*.whl"
           
-#          # Rename x86 Accelerate wheel to test on macOS 13 runner
-#          if [[ ${{ matrix.buildplat[0] }} == 'macos-13' && ${{ matrix.buildplat[4] }} == '14.0' ]]; then
-#            CIBW+=" && mv {dest_dir}/\$(basename {wheel}) \
-#              {dest_dir}/\$(echo \$(basename {wheel}) | sed 's/14_0/13_0/')"
-#          fi
+          # Rename x86 Accelerate wheel to test on macOS 13 runner
+          if [[ ${{ matrix.buildplat[0] }} == 'macos-13' && ${{ matrix.buildplat[4] }} == '14.0' ]]; then
+            CIBW+=" && mv {dest_dir}/\$(basename {wheel}) \
+              {dest_dir}/\$(echo \$(basename {wheel}) | sed 's/14_0/13_0/')"
+          fi
           
-#          # macos-arm64-openblas wheels that target macos-12 need a
-#          # MACOS_DEPLOYMENT_TARGET of 12.3 otherwise delocate complains.
-#          # Unclear of cause, possibly build tool related.
-#          # This results in wheels that have 12_3 in their name. Since Python
-#          # has no concept of minor OS versions in packaging land rename the
-#          # wheel back to 12.
-#          if [[ ${{ matrix.buildplat[0] }} == 'macos-14' && ${{ matrix.buildplat[4] }} == '12.3' ]]; then
-#            CIBW+=" && echo \$(ls {dest_dir}) && \
-#            mv {dest_dir}/*.whl \$(find {dest_dir} -type f -name '*.whl' | sed 's/12_3/12_0/')"
-#          fi
-#          echo "CIBW_REPAIR_WHEEL_COMMAND_MACOS=$CIBW" >> "$GITHUB_ENV"
+          # macos-arm64-openblas wheels that target macos-12 need a
+          # MACOS_DEPLOYMENT_TARGET of 12.3 otherwise delocate complains.
+          # Unclear of cause, possibly build tool related.
+          # This results in wheels that have 12_3 in their name. Since Python
+          # has no concept of minor OS versions in packaging land rename the
+          # wheel back to 12.
+          if [[ ${{ matrix.buildplat[0] }} == 'macos-14' && ${{ matrix.buildplat[4] }} == '12.3' ]]; then
+            CIBW+=" && echo \$(ls {dest_dir}) && \
+            mv {dest_dir}/*.whl \$(find {dest_dir} -type f -name '*.whl' | sed 's/12_3/12_0/')"
+          fi
+          echo "CIBW_REPAIR_WHEEL_COMMAND_MACOS=$CIBW" >> "$GITHUB_ENV"
 
       - name: Build wheels
         uses: pypa/cibuildwheel@ffd835cef18fa11522f608fc0fa973b89f5ddc87 # v3.1.0
