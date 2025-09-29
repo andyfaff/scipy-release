@@ -141,11 +141,11 @@ jobs:
             {delocate_archs} -w {dest_dir} {wheel} && echo "-----------" &&\
             delocate-listdeps -d {dest_dir}/*.whl
           
-          # Rename x86 Accelerate wheel to test on macOS 13 runner
-          if [[ ${{ matrix.buildplat[0] }} == 'macos-13' && ${{ matrix.buildplat[4] }} == '14.0' ]]; then
-            CIBW+=" && mv {dest_dir}/\$(basename {wheel}) \
-              {dest_dir}/\$(echo \$(basename {wheel}) | sed 's/14_0/13_0/')"
-          fi
+#          # Rename x86 Accelerate wheel to test on macOS 13 runner
+#          if [[ ${{ matrix.buildplat[0] }} == 'macos-13' && ${{ matrix.buildplat[4] }} == '14.0' ]]; then
+#            CIBW+=" && mv {dest_dir}/\$(basename {wheel}) \
+#              {dest_dir}/\$(echo \$(basename {wheel}) | sed 's/14_0/13_0/')"
+#          fi
           
 #          # macos-arm64-openblas wheels that target macos-12 need a
 #          # MACOS_DEPLOYMENT_TARGET of 12.3 otherwise delocate complains.
