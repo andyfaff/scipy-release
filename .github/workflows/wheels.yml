@@ -58,9 +58,9 @@ jobs:
 #        - [macos-13, macosx, x86_64, openblas, "10.14"]
 #        - [macos-13, macosx, x86_64, accelerate, "14.0"]
 #        - [macos-14, macosx, arm64, openblas, "12.3"]
-#        - [macos-14, macosx, arm64, accelerate, "14.0"]
+        - [macos-15, macosx, arm64, accelerate, "14.0"]
 #        - [windows-2025, win, AMD64, "", ""]
-        - [windows-11-arm, win, ARM64, "", ""]
+#        - [windows-11-arm, win, ARM64, "", ""]
         python: [["cp311", "3.11"], ["cp312", "3.12"]]#, ["cp313", "3.13"], ["cp313t", "3.13"], ["cp314", "cp314"], ["cp314t", "cp314"]]
         # python[0] is used to specify the python versions made by cibuildwheel
 
@@ -109,6 +109,26 @@ jobs:
           # passed through, so convert it to '/'
           $CIBW = $CIBW.replace("\","/")
           echo "CIBW_ENVIRONMENT_WINDOWS=PKG_CONFIG_PATH=$CIBW" >> $env:GITHUB_ENV
+
+      - name: Setup macOS
+        if: startsWith( matrix.buildplat[0], 'macos-' )
+        run: |
+          # Needed due to https://github.com/actions/runner-images/issues/3371
+          # Supported versions: https://github.com/actions/runner-images/blob/main/images/macos/macos-14-arm64-Readme.md
+          echo "FC=gfortran-13" >> "$GITHUB_ENV"
+          echo "F77=gfortran-13" >> "$GITHUB_ENV"
+          echo "F90=gfortran-13" >> "$GITHUB_ENV"
+
+          if [[ ${{ matrix.buildplat[2] }} == 'accelerate' ]]; then
+            # Builds with Accelerate only target macOS>=14.0
+            echo "CIBW_ENVIRONMENT_MACOS=MACOSX_DEPLOYMENT_TARGET=14.0 INSTALL_OPENBLAS=false" >> "$GITHUB_ENV"
+
+            # the macos-13 image that's used for building the x86_64 wheel can't test
+            # a wheel with deployment target >= 14 without further work
+            echo "CIBW_TEST_SKIP=*-macosx_x86_64" >> "$GITHUB_ENV"
+          else
+            echo "CIBW_ENVIRONMENT_MACOS=PKG_CONFIG_PATH=$PWD/.openblas" >> "$GITHUB_ENV"
+          fi
 
       - name: Build wheels
         uses: pypa/cibuildwheel@ffd835cef18fa11522f608fc0fa973b89f5ddc87 # v3.1.0
