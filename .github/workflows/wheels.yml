@@ -265,6 +265,8 @@ jobs:
           echo pkgconf_path is $pkgconf_path, OPENBLAS is ${OPENBLAS}
           rm -rf $pkgconf_path
           mkdir -p $pkgconf_path
+          ls -al
+          pwd
           python -m pip install -r $PWD/requirements/openblas_requirements.txt
           python -c "import scipy_${OPENBLAS}; print(scipy_${OPENBLAS}.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
           export PKG_CONFIG_PATH=$pkgconf_path
