@@ -1,4 +1,9 @@
+# This script is used by .github/workflows/wheels.yml to run the full test
+# suite, checks for license inclusion and that the openblas version is correct.
 set -xe
+
+PROJECT_DIR="$1"
+
 
 FREE_THREADED_BUILD="$(python -c"import sysconfig; print(bool(sysconfig.get_config_var('Py_GIL_DISABLED')))")"
 if [[ $FREE_THREADED_BUILD == "True" ]]; then
