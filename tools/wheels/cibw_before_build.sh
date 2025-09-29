@@ -1,19 +1,19 @@
 set -xe
 
 PROJECT_DIR="${1:-$PWD}"
-NUMPY_SRC_DIR="${1:-$PWD}/numpy-src"
+SCIPY_SRC_DIR="${1:-$PWD}/scipy-src"
 
 
 # Update license
-echo "" >> $NUMPY_SRC_DIR/LICENSE.txt
-echo "----" >> $NUMPY_SRC_DIR/LICENSE.txt
-echo "" >> $NUMPY_SRC_DIR/LICENSE.txt
+echo "" >> $SCIPY_SRC_DIR/LICENSE.txt
+echo "----" >> $SCIPY_SRC_DIR/LICENSE.txt
+echo "" >> $SCIPY_SRC_DIR/LICENSE.txt
 if [[ $RUNNER_OS == "Linux" ]] ; then
-    cat $PROJECT_DIR/tools/wheels/LICENSE_linux.txt >> $NUMPY_SRC_DIR/LICENSE.txt
+    cat $PROJECT_DIR/tools/wheels/LICENSE_linux.txt >> $SCIPY_SRC_DIR/LICENSE.txt
 elif [[ $RUNNER_OS == "macOS" ]]; then
-    cat $PROJECT_DIR/tools/wheels/LICENSE_osx.txt >> $NUMPY_SRC_DIR/LICENSE.txt
+    cat $PROJECT_DIR/tools/wheels/LICENSE_osx.txt >> $SCIPY_SRC_DIR/LICENSE.txt
 elif [[ $RUNNER_OS == "Windows" ]]; then
-    cat $PROJECT_DIR/tools/wheels/LICENSE_win32.txt >> $NUMPY_SRC_DIR/LICENSE.txt
+    cat $PROJECT_DIR/tools/wheels/LICENSE_win32.txt >> $SCIPY_SRC_DIR/LICENSE.txt
 fi
 
 if [[ $(python -c"import sys; print(sys.maxsize)") < $(python -c"import sys; print(2**33)") ]]; then
@@ -26,9 +26,9 @@ fi
 
 # Install OpenBLAS from scipy-openblas32|64
 if [[ "$INSTALL_OPENBLAS" = "true" ]] ; then
-    # By default, use scipy-openblas64
+    # By default, use scipy-openblas32
     # On 32-bit platforms and on win-arm64, use scipy-openblas32
-    OPENBLAS=openblas64
+    OPENBLAS=openblas32
     # Possible values for RUNNER_ARCH in GitHub Actions are: X86, X64, ARM, or ARM64
     if [[ $RUNNER_ARCH == "X86" || $RUNNER_ARCH == "ARM" ]] ; then
         OPENBLAS=openblas32
