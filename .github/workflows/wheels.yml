@@ -39,7 +39,7 @@ permissions:
 
 jobs:
   build_wheels:
-    name: Build wheel ${{ matrix.python[0] }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}--${{ matrix.buildplat[3] }}
+    name: Build wheel ${{ matrix.python[0] }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}-${{ matrix.buildplat[3] }}
     runs-on: ${{ matrix.buildplat[0] }}
     strategy:
       # Ensure that a wheel builder finishes even if another fails
@@ -128,14 +128,14 @@ jobs:
             echo "CIBW_ENVIRONMENT_MACOS=PKG_CONFIG_PATH=$PWD/.openblas" >> "$GITHUB_ENV"
           fi
  
-          LIB_PATH=$(dirname $(gfortran --print-file-name libgfortran.dylib))
+          LIB_PATH=$(dirname $(gfortran-13 --print-file-name libgfortran.dylib))
           CIBW="MACOSX_DEPLOYMENT_TARGET=${{ matrix.buildplat[4] }}\
             SDKROOT=$(xcrun --sdk macosx --show-sdk-path)\
             PKG_CONFIG_PATH=${{ github.workspace }}"
           echo "CIBW_ENVIRONMENT=$CIBW" >> "$GITHUB_ENV"
           echo "REPAIR_PATH=$LIB_PATH" >> "$GITHUB_ENV"
 
-          PREFIX=DYLD_LIBRARY_PATH="\$(dirname \$(gfortran --print-file-name libgfortran.dylib))"
+          PREFIX=DYLD_LIBRARY_PATH="\$(dirname \$(gfortran-13 --print-file-name libgfortran.dylib))"
           CIBW="$PREFIX delocate-listdeps -d {wheel} && echo "-----------" &&\
             $PREFIX delocate-wheel -v $EXCLUDE --require-archs \
             {delocate_archs} -w {dest_dir} {wheel} && echo "-----------" &&\
