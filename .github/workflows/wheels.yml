@@ -52,16 +52,16 @@ jobs:
         # [windows-2025, win*, "AMD64 x86"]. However, those two require a different compiler setup
         # so easier to separate out here.
         - [ubuntu-22.04, manylinux, x86_64, "", ""]
-#        - [ubuntu-22.04, musllinux, x86_64, "", ""]
-#        - [ubuntu-24.04-arm, manylinux, aarch64, "", ""]
-#        - [ubuntu-24.04-arm, musllinux, aarch64, "", ""]
+        - [ubuntu-22.04, musllinux, x86_64, "", ""]
+        - [ubuntu-24.04-arm, manylinux, aarch64, "", ""]
+        - [ubuntu-24.04-arm, musllinux, aarch64, "", ""]
 #        - [macos-13, macosx, x86_64, openblas, "10.14"]
 #        - [macos-13, macosx, x86_64, accelerate, "14.0"]
 #        - [macos-14, macosx, arm64, openblas, "12.3"]
 #        - [macos-14, macosx, arm64, accelerate, "14.0"]
 #        - [windows-2025, win, AMD64, "", ""]
 #        - [windows-11-arm, win, ARM64, "", ""]
-        python: [["cp311", "3.11"], ["cp312", "3.12"], ["cp313", "3.13"], ["cp313t", "3.13"], ["cp314", "cp314"], ["cp314t", "cp314"]]
+        python: [["cp311", "3.11"], ["cp312", "3.12"]]#, ["cp313", "3.13"], ["cp313t", "3.13"], ["cp314", "cp314"], ["cp314t", "cp314"]]
         # python[0] is used to specify the python versions made by cibuildwheel
 
     steps:
@@ -92,8 +92,10 @@ jobs:
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ matrix.python }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}
           path: ./dist/*.whl
+          name: ${{ matrix.python[0] }}-${{ matrix.buildplat[1] }}
+            ${{ matrix.buildplat[2] }} ${{ matrix.buildplat[3] }}
+            ${{ matrix.buildplat[4] }}
 
 #      # We upload nightlies only on cron job runs, so it doesn't overlap with
 #      # builds from which we publish to PyPI - we don't want these extra
