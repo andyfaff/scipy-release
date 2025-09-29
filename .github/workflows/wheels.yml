@@ -261,13 +261,13 @@ jobs:
         run: |
           python -m pip install -U pip build
           OPENBLAS=openblas32
-          pkgconf_path=$PWD/.openblas
+          pkgconf_path=$GITHUB_WORKSPACE/.openblas
           echo pkgconf_path is $pkgconf_path, OPENBLAS is ${OPENBLAS}
+
           rm -rf $pkgconf_path
-          mkdir -p $pkgconf_path
-          ls -al $PWD/requirements
-          pwd
-          python -m pip install -r $PWD/requirements/openblas_requirements.txt
+          mkdir - $pkgconf_path
+
+          python -m pip install -r $GITHUB_WORKSPACE/scipy-src/requirements/openblas.txt
           python -c "import scipy_${OPENBLAS}; print(scipy_${OPENBLAS}.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
           export PKG_CONFIG_PATH=$pkgconf_path
           
@@ -276,7 +276,7 @@ jobs:
       - name: Test the sdist
         run: |
           python -m pip install dist/*.gz
-          pip install -r requirements/wheel_test_requirements.txt
+          pip install -r $GITHUB_WORKSPACE/scipy-src/requirements/test.txt
           cd .. # Can't import scipy within scipy src directory
           python -c "import scipy, sys; print(scipy.__version__); sys.exit(scipy.test() is False)"
 
