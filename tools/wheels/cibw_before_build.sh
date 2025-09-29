@@ -46,6 +46,18 @@ if [[ "$INSTALL_OPENBLAS" = "true" ]] ; then
     python -m pip install -r $PROJECT_DIR/requirements/openblas_requirements.txt
     python -c "import scipy_${OPENBLAS}; print(scipy_${OPENBLAS}.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
 
+    if [[ $RUNNER_OS == "macOS" ]]; then
+      lib_loc=$(python -c"import scipy_openblas32; print(scipy_openblas32.get_lib_dir())")
+      # Use the libgfortran from gfortran rather than the one in the wheel
+      # since delocate gets confused if there is more than one
+      # https://github.com/scipy/scipy/issues/20852
+      install_name_tool -change @loader_path/../.dylibs/libgfortran.5.dylib @rpath/libgfortran.5.dylib $lib_loc/libsci*
+      install_name_tool -change @loader_path/../.dylibs/libgcc_s.1.1.dylib @rpath/libgcc_s.1.1.dylib $lib_loc/libsci*
+      install_name_tool -change @loader_path/../.dylibs/libquadmath.0.dylib @rpath/libquadmath.0.dylib $lib_loc/libsci*
+
+      codesign -s - -f $lib_loc/libsci*
+    fi
+
     # Copy scipy-openblas DLL's to a fixed location so we can point delvewheel
     # at it in `repair_windows.sh` (needed only on Windows because of the lack
     # of RPATH support).
@@ -56,18 +68,6 @@ srcdir = os.path.join(os.path.dirname(scipy_${OPENBLAS}.__file__), "lib")
 shutil.copytree(srcdir, os.path.join("$pkgconf_path", "lib"))
 EOF
     fi
-fi
-
-if [[ $RUNNER_OS == "macOS" ]]; then
-  lib_loc=$(python -c"import scipy_openblas32; print(scipy_openblas32.get_lib_dir())")
-  # Use the libgfortran from gfortran rather than the one in the wheel
-  # since delocate gets confused if there is more than one
-  # https://github.com/scipy/scipy/issues/20852
-  install_name_tool -change @loader_path/../.dylibs/libgfortran.5.dylib @rpath/libgfortran.5.dylib $lib_loc/libsci*
-  install_name_tool -change @loader_path/../.dylibs/libgcc_s.1.1.dylib @rpath/libgcc_s.1.1.dylib $lib_loc/libsci*
-  install_name_tool -change @loader_path/../.dylibs/libquadmath.0.dylib @rpath/libquadmath.0.dylib $lib_loc/libsci*
-
-  codesign -s - -f $lib_loc/libsci*
 fi
 
 # cibuildwheel doesn't install delvewheel by default
