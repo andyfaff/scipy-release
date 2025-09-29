@@ -13,3 +13,7 @@ if [[ $FREE_THREADED_BUILD == "True" ]]; then
 fi
 
 python -c "import sys; import scipy; sys.exit(not scipy.test())"
+
+
+# Check license file content
+python $PROJECT_DIR/tools/wheels/check_license.py
