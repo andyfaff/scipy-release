@@ -119,7 +119,7 @@ jobs:
           echo "F77=gfortran-13" >> "$GITHUB_ENV"
           echo "F90=gfortran-13" >> "$GITHUB_ENV"
 
-          if [[ ${{ matrix.buildplat[2] }} == 'accelerate' ]]; then
+          if [[ ${{ matrix.buildplat[3] }} == 'accelerate' ]]; then
             echo CIBW_CONFIG_SETTINGS=\"setup-args=-Dblas=accelerate\" >> "$GITHUB_ENV"
 
             # Builds with Accelerate only target macOS>=14.0
