@@ -138,7 +138,8 @@ jobs:
       #     The libraries are also built with an older version of gfortran (11), which
       #     requires installation of that version. Whilst this version is available
       #     from homebrew, it doesn't come with an old enough deployment target.
-      #     We therefore have to jump through hoops to install a pre-packaged compiler.
+      #     We therefore have to jump through hoops to install a community packaged
+      #     compiler.
       - name: Setup macOS
         if: startsWith( matrix.buildplat[0], 'macos-' )
         run: |
@@ -259,12 +260,21 @@ jobs:
       - name: Build sdist
         run: |
           python -m pip install -U pip build
+          OPENBLAS=openblas32
+          pkgconf_path=$GITHUB_WORKSPACE/.openblas
+          echo pkgconf_path is $pkgconf_path, OPENBLAS is ${OPENBLAS}
+          rm -rf $pkgconf_path
+          mkdir -p $pkgconf_path
+          python -m pip install -r $PROJECT_DIR/requirements/openblas_requirements.txt
+          python -c "import scipy_${OPENBLAS}; print(scipy_${OPENBLAS}.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
+          export PKG_CONFIG_PATH=$pkgconf_path
+          
           python -m build --sdist
 
       - name: Test the sdist
         run: |
           python -m pip install dist/*.gz
-          pip install -r requirements/test_requirements.txt
+          pip install -r requirements/wheel_test_requirements.txt
           cd .. # Can't import scipy within scipy src directory
           python -c "import scipy, sys; print(scipy.__version__); sys.exit(scipy.test() is False)"
 

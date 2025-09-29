@@ -5,6 +5,11 @@ set -xe
 PROJECT_DIR="$1"
 
 
+# Check license file content
+# Check at start because the actual tests take quite a long time to run
+python $PROJECT_DIR/tools/wheels/check_license.py
+
+
 FREE_THREADED_BUILD="$(python -c"import sysconfig; print(bool(sysconfig.get_config_var('Py_GIL_DISABLED')))")"
 if [[ $FREE_THREADED_BUILD == "True" ]]; then
     # Manually check that importing SciPy does not re-enable the GIL.
@@ -18,7 +23,3 @@ if [[ $FREE_THREADED_BUILD == "True" ]]; then
 fi
 
 python -c "import sys; import scipy; sys.exit(not scipy.test())"
-
-
-# Check license file content
-python $PROJECT_DIR/tools/wheels/check_license.py
