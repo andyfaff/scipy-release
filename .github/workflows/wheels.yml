@@ -156,13 +156,11 @@ jobs:
           else
             # setting SDKROOT may be necessary when using the gfortran compiler
             # installed in gfortran_macos.sh
-            CIBW_ENV=$PWD  
-            #             CIBW_ENV="CIBW_ENVIRONMENT_MACOS=PKG_CONFIG_PATH=$PWD/.openblas\
-            #               MACOSX_DEPLOYMENT_TARGET=${{ matrix.buildplat[4] }}\
-            #               SDKROOT=$(xcrun --sdk macosx --show-sdk-path)"
+              
+            CIBW_ENV="CIBW_ENVIRONMENT_MACOS=PKG_CONFIG_PATH=$PWD/.openblas MACOSX_DEPLOYMENT_TARGET=${{ matrix.buildplat[4] }} SDKROOT=$(xcrun --sdk macosx --show-sdk-path)"
           fi
 
-          #          CIBW="sudo xcode-select -s /Applications/Xcode_15.2.0.app"
+          CIBW="sudo xcode-select -s /Applications/Xcode_15.2.0.app"
           echo "CIBW_BEFORE_ALL=$CIBW" >> $GITHUB_ENV
           echo "$CIBW_ENV" >> "$GITHUB_ENV"
 
