@@ -7,7 +7,7 @@ and that it appears to contain text prevalent for a SciPy binary
 distribution.
 
 """
-import os
+import pathlib
 import sys
 import re
 import argparse
@@ -34,8 +34,12 @@ def main():
     __import__(args.module)
     mod = sys.modules[args.module]
 
+    # LICENSE.txt is installed in the .dist-info directory, so find it there
+    sitepkgs = pathlib.Path(mod.__file__).parent.parent
+    distinfo_path = next(iter(sitepkgs.glob("scipy-*.dist-info")))
+
     # Check license text
-    license_txt = os.path.join(os.path.dirname(mod.__file__), "LICENSE.txt")
+    license_txt = distinfo_path / "LICENSE.txt"
     with open(license_txt, encoding="utf-8") as f:
         text = f.read()
 
