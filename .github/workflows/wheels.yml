@@ -137,6 +137,7 @@ jobs:
       #     necessitates using install_name_tool on the scipy_openblas32 dylibs.
       #     The libraries are also built with an older version of gfortran (11), which
       #     requires installation of that version.
+
       - name: Setup macOS
         if: startsWith( matrix.buildplat[0], 'macos-' )
         run: |
