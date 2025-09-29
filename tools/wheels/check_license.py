@@ -15,7 +15,7 @@ import argparse
 
 def check_text(text):
     ok = "Copyright (c)" in text and re.search(
-        r"This binary distribution of \w+ also bundles the following software",
+        r"This binary distribution of \w+ can also bundle the following software",
         text,
         re.IGNORECASE
     )
