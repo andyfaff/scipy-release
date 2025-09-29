@@ -55,10 +55,10 @@ jobs:
 #        - [ubuntu-22.04, musllinux, x86_64, "", ""]
 #        - [ubuntu-24.04-arm, manylinux, aarch64, "", ""]
 #        - [ubuntu-24.04-arm, musllinux, aarch64, "", ""]
-#        - [macos-13, macosx, x86_64, openblas, "10.14"]
+        - [macos-13, macosx, x86_64, openblas, "10.14"]
         - [macos-13, macosx, x86_64, accelerate, "14.0"]
         - [macos-14, macosx, arm64, openblas, "12.3"]
-        - [macos-15, macosx, arm64, accelerate, "14.0"]
+        - [macos-14, macosx, arm64, accelerate, "14.0"]
 #        - [windows-2025, win, AMD64, "", ""]
 #        - [windows-11-arm, win, ARM64, "", ""]
         python: [["cp311", "3.11"], ["cp312", "3.12"]]#, ["cp313", "3.13"], ["cp313t", "3.13"], ["cp314", "cp314"], ["cp314t", "cp314"]]
@@ -110,6 +110,21 @@ jobs:
           $CIBW = $CIBW.replace("\","/")
           echo "CIBW_ENVIRONMENT_WINDOWS=PKG_CONFIG_PATH=$CIBW" >> $env:GITHUB_ENV
 
+      # the macOS matrix is complicated.
+      # - arm64,  accelerate, >=14.0
+      #     The easiest of them all (sort of). However, you can only build on
+      #     macos-14 with the system compiler. If you try building on macos-15
+      #     there are libraries with a minimum target of 15.
+      # - x86_64, accelerate, >=14.0
+      #     Complicated because x86_64 can only build on macos-13 image, which is
+      #     deprecated. It's also made difficult to test on macos13 because the
+      #     deployment target is 14. This means one has to rename the wheel to 13
+      #     for testing, then after the build you have to do a further name change
+      #     of the wheel to 14.
+      # - arm64, openblas, "12.3"
+      #     Complicated because MACOS_DEPLOYMENT_TARGET has to be set to 12.3, which
+      #     results in 12_3 in the wheel name. This is illegal, so we have to change
+      #     the wheel name to 12_0 after the build.
       - name: Setup macOS
         if: startsWith( matrix.buildplat[0], 'macos-' )
         run: |
