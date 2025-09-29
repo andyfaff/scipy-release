@@ -1,0 +1,314 @@
+name: Publish sdist and wheels
+
+env:
+  # A tag or branch name or a commit hash for the numpy/numpy repo, for which
+  # to build wheels. This is normally set to `main` in the main branch of this
+  # repo, and to a tag name (e.g., `v2.3.2`) on a release branch.
+  SOURCE_REF_TO_BUILD: main
+
+on:
+  schedule:
+    #        ┌───────────── minute (0 - 59)
+    #        │  ┌───────────── hour (0 - 23)
+    #        │  │ ┌───────────── day of the month (1 - 31)
+    #        │  │ │ ┌───────────── month (1 - 12 or JAN-DEC)
+    #        │  │ │ │ ┌───────────── day of the week (0 - 6 or SUN-SAT)
+    #        │  │ │ │ │
+    - cron: "42 2 * * SUN,WED"
+  pull_request:
+    branches:
+      - main
+      - maintenance/**
+  push:
+    branches:
+      - main  # FOR TESTING ONLY
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which PyPI environment to upload to, if any
+        required: true
+        type: choice
+        options: ["none", "testpypi", "pypi"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+jobs:
+  build_wheels:
+    name: Build wheel ${{ matrix.python }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}
+    runs-on: ${{ matrix.buildplat[0] }}
+    strategy:
+      # Ensure that a wheel builder finishes even if another fails
+      fail-fast: false
+      matrix:
+        # Github Actions doesn't support pairing matrix values together, let's improvise
+        # https://github.com/github/feedback/discussions/7835#discussioncomment-1769026
+        buildplat:
+          - [ubuntu-22.04, manylinux_x86_64, ""]
+          - [ubuntu-22.04, musllinux_x86_64, ""]
+          - [ubuntu-22.04-arm, manylinux_aarch64, ""]
+          - [ubuntu-22.04-arm, musllinux_aarch64, ""]
+          - [macos-13, macosx_x86_64, openblas]
+
+          # targeting macos >= 14. Could probably build on macos-14, but it would be a cross-compile
+          - [macos-13, macosx_x86_64, accelerate]
+          - [macos-14, macosx_arm64, openblas]
+          - [macos-14, macosx_arm64, accelerate]
+          - [windows-2022, win_amd64, ""]
+          - [windows-2022, win32, ""]
+          - [windows-11-arm, win_arm64, ""]
+        python: ["cp311", "cp312", "cp313", "cp313t", "cp314", "cp314t", "pp311"]
+        exclude:
+          # Don't build PyPy 32-bit windows
+          - buildplat: [windows-2022, win32, ""]
+            python: "pp311"
+          # Don't build PyPy arm64 windows
+          - buildplat: [windows-11-arm, win_arm64, ""]
+            python: "pp311"
+          # No PyPy on musllinux images
+          - buildplat: [ ubuntu-22.04, musllinux_x86_64, "" ]
+            python: "pp311"
+          - buildplat: [ ubuntu-22.04-arm, musllinux_aarch64, "" ]
+            python: "pp311"
+          - buildplat: [ macos13, macosx_x86_64, openblas ]
+            python: "cp313t"
+          - buildplat: [ macos13, macosx_x86_64, openblas ]
+            python: "cp314t"
+        include:
+          - buildplat: [ ubuntu-22.04, pyodide_wasm32, "" ]
+            python: "cp313"
+    env:
+      IS_32_BIT: ${{ matrix.buildplat[1] == 'win32' }}  # used in a cibw_*.sh script
+
+    steps:
+      - name: Checkout numpy-release
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Checkout numpy
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: numpy/numpy
+          ref: ${{ env.SOURCE_REF_TO_BUILD }}
+          path: numpy-src
+          submodules: true
+          persist-credentials: false
+
+      - name: Setup MSVC (32-bit)
+        if: ${{ matrix.buildplat[1] == 'win32' }}
+        uses: bus1/cabuild/action/msdevshell@e22aba57d6e74891d059d66501b6b5aed8123c4d  # v1
+        with:
+          architecture: 'x86'
+
+      - name: Setup LLVM for Windows ARM64
+        if: ${{ matrix.buildplat[1] == 'win_arm64' }}
+        uses: ./.github/windows_arm64_steps
+
+      - name: pkg-config-for-win
+        if: runner.os == 'windows'
+        run: |
+          choco install -y --no-progress --stoponfirstfailure --checksum 6004DF17818F5A6DBF19CB335CC92702 pkgconfiglite
+          $CIBW = "${{ github.workspace }}/.openblas"
+          # pkgconfig needs a complete path, and not just "./openblas since the
+          # build is run in a tmp dir (?)
+          # It seems somewhere in the env passing, `\` is not
+          # passed through, so convert it to '/'
+          $CIBW = $CIBW.replace("\","/")
+          echo "CIBW_ENVIRONMENT_WINDOWS=PKG_CONFIG_PATH=$CIBW" >> $env:GITHUB_ENV
+
+      - name: Setup macOS
+        if: matrix.buildplat[0] == 'macos-13' || matrix.buildplat[0] == 'macos-14'
+        run: |
+          # Needed due to https://github.com/actions/runner-images/issues/3371
+          # Supported versions: https://github.com/actions/runner-images/blob/main/images/macos/macos-14-arm64-Readme.md
+          echo "FC=gfortran-13" >> "$GITHUB_ENV"
+          echo "F77=gfortran-13" >> "$GITHUB_ENV"
+          echo "F90=gfortran-13" >> "$GITHUB_ENV"
+
+          if [[ ${{ matrix.buildplat[2] }} == 'accelerate' ]]; then
+            # Builds with Accelerate only target macOS>=14.0
+            echo "CIBW_ENVIRONMENT_MACOS=MACOSX_DEPLOYMENT_TARGET=14.0 INSTALL_OPENBLAS=false" >> "$GITHUB_ENV"
+
+            # the macos-13 image that's used for building the x86_64 wheel can't test
+            # a wheel with deployment target >= 14 without further work
+            echo "CIBW_TEST_SKIP=*-macosx_x86_64" >> "$GITHUB_ENV"
+          else
+            echo "CIBW_ENVIRONMENT_MACOS=PKG_CONFIG_PATH=$PWD/.openblas" >> "$GITHUB_ENV"
+          fi
+
+      - name: Pyodide setup
+        if: ${{ matrix.buildplat[1] == 'pyodide_wasm32' }}
+        run: |
+          echo "CIBW_PLATFORM=pyodide" >> "$GITHUB_ENV"
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@c923d83ad9c1bc00211c5041d0c3f73294ff88f6 # v3.1.4
+        env:
+          CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}
+          SRC: ${{ github.workspace }}/numpy-src
+        with:
+           package-dir: numpy-src
+           output-dir: dist
+           config-file: cibuildwheel.toml
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.python }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}
+          path: ./dist/*.whl
+
+      # We upload nightlies only on cron job runs, so it doesn't overlap with
+      # builds from which we publish to PyPI - we don't want these extra
+      # dependencies when building release artifacts.
+      - name: install micromamba
+        # win-arm64 is unsupported by micromamba at the moment
+        if: github.event_name == 'schedule' && matrix.buildplat[1] != 'win_arm64'
+        uses: mamba-org/setup-micromamba@b09ef9b599704322748535812ca03efb2625677b # v2.0.5
+        with:
+          # For installation of anaconda-client, required for upload to anaconda.org
+          init-shell: bash
+          environment-name: upload-env
+          create-args: >-
+            anaconda-client
+
+      - name: win-arm64 install anaconda client
+        if: github.event_name == 'schedule' && matrix.buildplat[1] == 'win_arm64'
+        run: |
+          # Rust installation needed for rpds-py.
+          Invoke-WebRequest https://static.rust-lang.org/rustup/dist/aarch64-pc-windows-msvc/rustup-init.exe -UseBasicParsing -Outfile rustup-init.exe
+          .\rustup-init.exe -y
+          $env:PATH="$env:PATH;$env:USERPROFILE\.cargo\bin"
+          pip install anaconda-client
+
+      - name: Upload to anaconda.org
+        if: github.event_name == 'schedule' && github.repository == 'numpy/numpy-release'
+        shell: bash -el {0}  # required for micromamba
+        env:
+          TOKEN: ${{ secrets.NUMPY_NIGHTLY_UPLOAD_TOKEN }}
+        run: |
+          anaconda -q -t ${TOKEN} upload --force -u scientific-python-nightly-wheels ./dist/*.whl
+
+  build_sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout numpy
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: numpy/numpy
+          submodules: true
+          ref: ${{ env.SOURCE_REF_TO_BUILD }}
+          persist-credentials: false
+
+      - name: Build sdist
+        run: |
+          python -m pip install -U pip build
+          python -m build --sdist -Csetup-args=-Dallow-noblas=true
+
+      - name: Test the sdist
+        run: |
+          python -m pip install dist/*.gz -Csetup-args=-Dallow-noblas=true
+          pip install -r requirements/test_requirements.txt
+          cd .. # Can't import numpy within numpy src directory
+          python -c "import numpy, sys; print(numpy.__version__); sys.exit(numpy.test() is False)"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sdist
+          path: ./dist/*
+
+  testpypi-publish:
+    name: Publish release to TestPyPI
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'testpypi'
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/numpy
+    permissions:
+      id-token: write  # mandatory for trusted publishing
+    steps:
+      - name: Download sdist and wheels
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Remove wasm wheels
+        run: |
+          cd dist
+          ls -al
+          rm -r *wasm*
+          ls -al
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc # v1.12.4
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+          print-hash: true
+          attestations: true
+
+  check_version:
+    name: Ensure commit is tag before upload to PyPi
+
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'pypi'
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout numpy
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: numpy/numpy
+          ref: ${{ env.SOURCE_REF_TO_BUILD }}
+          path: numpy-src
+          fetch-depth: 0
+          fetch-tags: true
+          submodules: false
+          persist-credentials: false
+
+      - name: Examine git commit
+        run: |
+          cd numpy-src
+          hash=$(git describe HEAD)
+          echo $hash
+          if [[ $hash == *"-"*"-"* ]]; then
+            echo "SOURCE_REF_TO_BUILD is not a tag"
+            exit 1
+          else
+            echo "SOURCE_REF_TO_BUILD is a tag"
+          fi;
+
+  pypi-publish:
+    name: Publish release to PyPI
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'pypi'
+    needs: [check_version]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/numpy
+    permissions:
+      id-token: write  # mandatory for trusted publishing
+    steps:
+      - name: Download sdist and wheels
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Remove wasm wheels
+        run: |
+          cd dist
+          ls -al
+          rm -r *wasm*
+          ls -al
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc # v1.12.4
+        with:
+          print-hash: true
+          attestations: true
