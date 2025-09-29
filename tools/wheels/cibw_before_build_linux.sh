@@ -25,5 +25,5 @@ cat $PROJECT_DIR/tools/wheels/LICENSE_linux.txt >> $PROJECT_DIR/LICENSE.txt
 #fi
 
 # Install OpenBLAS
-python -m pip install -r $PROJECT_DIR/requirements/openblas.txt
+python -m pip install -r $PROJECT_DIR/requirements/openblas_requirements.txt
 python -c "import scipy_openblas32; print(scipy_openblas32.get_pkg_config())" > $PROJECT_DIR/scipy-openblas.pc
