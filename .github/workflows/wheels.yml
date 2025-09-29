@@ -51,15 +51,15 @@ jobs:
         # should also be able to do multi-archs on a single entry, e.g.
         # [windows-2025, win*, "AMD64 x86"]. However, those two require a different compiler setup
         # so easier to separate out here.
-        - [ubuntu-22.04, manylinux, x86_64, "", ""]
-        - [ubuntu-22.04, musllinux, x86_64, "", ""]
-        - [ubuntu-24.04-arm, manylinux, aarch64, "", ""]
-        - [ubuntu-24.04-arm, musllinux, aarch64, "", ""]
+#        - [ubuntu-22.04, manylinux, x86_64, "", ""]
+#        - [ubuntu-22.04, musllinux, x86_64, "", ""]
+#        - [ubuntu-24.04-arm, manylinux, aarch64, "", ""]
+#        - [ubuntu-24.04-arm, musllinux, aarch64, "", ""]
 #        - [macos-13, macosx, x86_64, openblas, "10.14"]
 #        - [macos-13, macosx, x86_64, accelerate, "14.0"]
 #        - [macos-14, macosx, arm64, openblas, "12.3"]
 #        - [macos-14, macosx, arm64, accelerate, "14.0"]
-#        - [windows-2025, win, AMD64, "", ""]
+        - [windows-2025, win, AMD64, "", ""]
 #        - [windows-11-arm, win, ARM64, "", ""]
         python: [["cp311", "3.11"], ["cp312", "3.12"]]#, ["cp313", "3.13"], ["cp313t", "3.13"], ["cp314", "cp314"], ["cp314t", "cp314"]]
         # python[0] is used to specify the python versions made by cibuildwheel
@@ -79,6 +79,22 @@ jobs:
           submodules: true
           persist-credentials: false
 
+      - name: win_amd64 - install rtools
+        if: ${{ matrix.buildplat[1] == 'win' && matrix.buildplat[2] == 'AMD64' }}
+        run: |
+          # mingw-w64
+          choco install rtools -y --no-progress --force --version=4.0.0.20220206
+          echo "c:\rtools40\ucrt64\bin;" >> $env:GITHUB_PATH
+
+      - name: windows - set PKG_CONFIG_PATH
+        if: ${{ matrix.buildplat[1] == 'win' }}
+        run: |
+          $env:CIBW = "${{ github.workspace }}"
+          # It seems somewhere in the env passing, `\` is not
+          # passed through, so convert it to '/'
+          $env:CIBW=$env:CIBW.replace("\","/")
+          echo "CIBW_ENVIRONMENT=PKG_CONFIG_PATH=$env:CIBW" >> $env:GITHUB_ENV
+
       - name: Build wheels
         uses: pypa/cibuildwheel@ffd835cef18fa11522f608fc0fa973b89f5ddc87 # v3.1.0
         env:
@@ -97,19 +113,19 @@ jobs:
             ${{ matrix.buildplat[2] }} ${{ matrix.buildplat[3] }}
             ${{ matrix.buildplat[4] }}
 
-#      # We upload nightlies only on cron job runs, so it doesn't overlap with
-#      # builds from which we publish to PyPI - we don't want these extra
-#      # dependencies when building release artifacts.
-#      - name: install micromamba
-#        # win-arm64 is unsupported by micromamba at the moment
-#        if: github.event_name == 'schedule' && matrix.buildplat[1] != 'win_arm64'
-#        uses: mamba-org/setup-micromamba@b09ef9b599704322748535812ca03efb2625677b # v2.0.5
-#        with:
-#          # For installation of anaconda-client, required for upload to anaconda.org
-#          init-shell: bash
-#          environment-name: upload-env
-#          create-args: >-
-#            anaconda-client
+      # We upload nightlies only on cron job runs, so it doesn't overlap with
+      # builds from which we publish to PyPI - we don't want these extra
+      # dependencies when building release artifacts.
+      - name: install micromamba
+        # win-arm64 is unsupported by micromamba at the moment
+        if: github.event_name == 'schedule' && matrix.buildplat[1] != 'win_arm64'
+        uses: mamba-org/setup-micromamba@b09ef9b599704322748535812ca03efb2625677b # v2.0.5
+        with:
+          # For installation of anaconda-client, required for upload to anaconda.org
+          init-shell: bash
+          environment-name: upload-env
+          create-args: >-
+            anaconda-client
 
 #      - name: win-arm64 install anaconda client
 #        if: github.event_name == 'schedule' && matrix.buildplat[1] == 'win_arm64'
