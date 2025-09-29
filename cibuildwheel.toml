@@ -26,9 +26,6 @@ RUNNER_OS="Linux"
 # /project will be the $PWD equivalent inside the Docker container used to build the wheel
 PKG_CONFIG_PATH="/project/.openblas"
 
-[tool.cibuildwheel.macos]
-before-build = "bash {project}/tools/wheels/cibw_before_build_macos.sh {project}"
-
 [tool.cibuildwheel.macos.environment]
 PKG_CONFIG_PATH = "{project}"
 
