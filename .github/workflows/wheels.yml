@@ -277,6 +277,8 @@ jobs:
 
       - name: Test the sdist
         run: |
+          echo $PKG_CONFIG_PATH
+          ls -al
           python -m pip install dist/*.gz
           pip install -r $GITHUB_WORKSPACE/scipy-src/requirements/test.txt
           cd .. # Can't import scipy within scipy src directory
