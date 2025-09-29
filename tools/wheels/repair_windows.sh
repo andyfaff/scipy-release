@@ -8,9 +8,6 @@ OPENBLAS_DIR=$(python -c"import scipy_openblas32 as sop; print(sop.get_lib_dir()
 # TARGET_ARCH should be set by the CI environment (e.g., ARM64, AMD64)
 TARGET_ARCH="${TARGET_ARCH:-}" # Default to empty string if not set
 
-# delvewheel is the equivalent of delocate/auditwheel for windows.
-python -m pip install delvewheel wheel
-
 if [ "$TARGET_ARCH" = "ARM64" ]; then
   echo "Skipping stripping for ARM64 target."
 else

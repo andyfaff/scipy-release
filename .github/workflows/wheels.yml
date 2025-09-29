@@ -59,8 +59,8 @@ jobs:
 #        - [macos-13, macosx, x86_64, accelerate, "14.0"]
 #        - [macos-14, macosx, arm64, openblas, "12.3"]
 #        - [macos-14, macosx, arm64, accelerate, "14.0"]
-        - [windows-2025, win, AMD64, "", ""]
-#        - [windows-11-arm, win, ARM64, "", ""]
+#        - [windows-2025, win, AMD64, "", ""]
+        - [windows-11-arm, win, ARM64, "", ""]
         python: [["cp311", "3.11"], ["cp312", "3.12"]]#, ["cp313", "3.13"], ["cp313t", "3.13"], ["cp314", "cp314"], ["cp314t", "cp314"]]
         # python[0] is used to specify the python versions made by cibuildwheel
 
@@ -86,6 +86,17 @@ jobs:
           choco install rtools -y --no-progress --force --version=4.0.0.20220206
           echo "c:\rtools40\ucrt64\bin;" >> $env:GITHUB_PATH
 
+      - name: Set environment variables for ARM64
+        if: matrix.buildplat[1] == 'win' && matrix.buildplat[2] == 'ARM64'
+        run: |
+            echo "CC=clang-cl" >> $env:GITHUB_ENV
+            echo "CXX=clang-cl" >> $env:GITHUB_ENV
+            echo "FC=flang" >> $env:GITHUB_ENV
+            echo "TARGET_ARCH=${{ matrix.buildplat[2] }}" >> $env:GITHUB_ENV
+
+      - name: Set up Flang and pkgconf for ARM64
+        if: matrix.buildplat[1] == 'win' && matrix.buildplat[2] == 'ARM64'
+        uses: ./.github/windows_arm64_steps
 
       - name: pkg-config-for-win
         if: runner.os == 'windows'
