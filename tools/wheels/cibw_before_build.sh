@@ -49,7 +49,7 @@ if [[ "$INSTALL_OPENBLAS" = "true" ]] ; then
     if [[ $RUNNER_OS == "macOS" ]]; then
       # For scipy_openblas we need the older fortran compilers that were used to
       # build it, homebrew's are too modern.
-      # source $PROJECT_DIR/tools/wheels/gfortran.sh
+      source $PROJECT_DIR/tools/wheels/gfortran.sh
 
       lib_loc=$(python -c"import scipy_openblas32; print(scipy_openblas32.get_lib_dir())")
       # Use the libgfortran from gfortran rather than the one in the wheel

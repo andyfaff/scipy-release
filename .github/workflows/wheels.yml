@@ -150,20 +150,19 @@ jobs:
             LIB_PATH=$(dirname $(gfortran --print-file-name libgfortran.dylib))
   
             # Builds with Accelerate only target macOS>=14.0
-            echo "CIBW_ENVIRONMENT_MACOS=MACOSX_DEPLOYMENT_TARGET=14.0 INSTALL_OPENBLAS=false" >> "$GITHUB_ENV"
+            CIBW_ENV="CIBW_ENVIRONMENT_MACOS=MACOSX_DEPLOYMENT_TARGET=14.0 INSTALL_OPENBLAS=false"
           else
-            brew install gcc@11
-            ln -s $(which gfortran-11) gfortran
-            export PATH=$PWD:$PATH
-            echo "PATH=$PATH" >> "$GITHUB_ENV"
-            LIB_PATH=$(dirname $(gfortran --print-file-name libgfortran.dylib))
+            # setting SDKROOT may be necessary when using the gfortran compiler
+            # installed in gfortran_macos.sh
 
-            echo "CIBW_ENVIRONMENT_MACOS=PKG_CONFIG_PATH=$PWD/.openblas" >> "$GITHUB_ENV"
+             CIBW_ENV="CIBW_ENVIRONMENT_MACOS=PKG_CONFIG_PATH=$PWD/.openblas\
+               MACOSX_DEPLOYMENT_TARGET=${{ matrix.buildplat[4] }}\
+               SDKROOT=$(xcrun --sdk macosx --show-sdk-path)\
           fi
- 
+
           CIBW="sudo xcode-select -s /Applications/Xcode_15.2.0.app"
           echo "CIBW_BEFORE_ALL=$CIBW" >> $GITHUB_ENV
-
+          echo "CIBW_ENV" >> "$GITHUB_ENV"
 
           PREFIX=DYLD_LIBRARY_PATH="\$(dirname \$(gfortran --print-file-name libgfortran.dylib))"
           CIBW="$PREFIX delocate-listdeps -d {wheel} && echo "-----------" &&\
