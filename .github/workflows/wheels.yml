@@ -1,7 +1,7 @@
 name: Publish sdist and wheels
 
 env:
-  # A tag or branch name or a commit hash for the numpy/numpy repo, for which
+  # A tag or branch name or a commit hash for the scipy/scipy repo, for which
   # to build wheels. This is normally set to `main` in the main branch of this
   # repo, and to a tag name (e.g., `v2.3.2`) on a release branch.
   SOURCE_REF_TO_BUILD: main
@@ -85,17 +85,17 @@ jobs:
       IS_32_BIT: ${{ matrix.buildplat[1] == 'win32' }}  # used in a cibw_*.sh script
 
     steps:
-      - name: Checkout numpy-release
+      - name: Checkout scipy-release
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
 
-      - name: Checkout numpy
+      - name: Checkout scipy
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          repository: numpy/numpy
+          repository: scipy/scipy
           ref: ${{ env.SOURCE_REF_TO_BUILD }}
-          path: numpy-src
+          path: scipy-src
           submodules: true
           persist-credentials: false
 
@@ -150,9 +150,9 @@ jobs:
         uses: pypa/cibuildwheel@c923d83ad9c1bc00211c5041d0c3f73294ff88f6 # v3.1.4
         env:
           CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}
-          SRC: ${{ github.workspace }}/numpy-src
+          SRC: ${{ github.workspace }}/scipy-src
         with:
-           package-dir: numpy-src
+           package-dir: scipy-src
            output-dir: dist
            config-file: cibuildwheel.toml
 
@@ -185,10 +185,10 @@ jobs:
           pip install anaconda-client
 
       - name: Upload to anaconda.org
-        if: github.event_name == 'schedule' && github.repository == 'numpy/numpy-release'
+        if: github.event_name == 'schedule' && github.repository == 'scipy/scipy-release'
         shell: bash -el {0}  # required for micromamba
         env:
-          TOKEN: ${{ secrets.NUMPY_NIGHTLY_UPLOAD_TOKEN }}
+          TOKEN: ${{ secrets.scipy_NIGHTLY_UPLOAD_TOKEN }}
         run: |
           anaconda -q -t ${TOKEN} upload --force -u scientific-python-nightly-wheels ./dist/*.whl
 
@@ -196,10 +196,10 @@ jobs:
     name: Build sdist
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout numpy
+      - name: Checkout scipy
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          repository: numpy/numpy
+          repository: scipy/scipy
           submodules: true
           ref: ${{ env.SOURCE_REF_TO_BUILD }}
           persist-credentials: false
@@ -213,8 +213,8 @@ jobs:
         run: |
           python -m pip install dist/*.gz -Csetup-args=-Dallow-noblas=true
           pip install -r requirements/test_requirements.txt
-          cd .. # Can't import numpy within numpy src directory
-          python -c "import numpy, sys; print(numpy.__version__); sys.exit(numpy.test() is False)"
+          cd .. # Can't import scipy within scipy src directory
+          python -c "import scipy, sys; print(scipy.__version__); sys.exit(scipy.test() is False)"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -228,7 +228,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/numpy
+      url: https://test.pypi.org/p/scipy
     permissions:
       id-token: write  # mandatory for trusted publishing
     steps:
@@ -260,12 +260,12 @@ jobs:
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout numpy
+      - name: Checkout scipy
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          repository: numpy/numpy
+          repository: scipy/scipy
           ref: ${{ env.SOURCE_REF_TO_BUILD }}
-          path: numpy-src
+          path: scipy-src
           fetch-depth: 0
           fetch-tags: true
           submodules: false
@@ -273,7 +273,7 @@ jobs:
 
       - name: Examine git commit
         run: |
-          cd numpy-src
+          cd scipy-src
           hash=$(git describe HEAD)
           echo $hash
           if [[ $hash == *"-"*"-"* ]]; then
@@ -290,7 +290,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/numpy
+      url: https://pypi.org/p/scipy
     permissions:
       id-token: write  # mandatory for trusted publishing
     steps:
