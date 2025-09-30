@@ -161,8 +161,9 @@ jobs:
           # Activate base environment for immediate use in this script
           source "${INSTALL_DIR}/etc/profile.d/conda.sh"
           conda activate base
-          conda install -y compilers
-          echo "CIBW_BEFORE_ALL="conda activate base"" >> $GITHUB_ENV
+          conda install -q -y compilers
+          CIBW="source \"${INSTALL_DIR}/etc/profile.d/conda.sh\" && conda activate base"
+          echo "CIBW_BEFORE_ALL="$CIBW" >> $GITHUB_ENV
 
           if [[ ${{ matrix.buildplat[3] }} == 'accelerate' ]]; then
             echo CIBW_CONFIG_SETTINGS=\"setup-args=-Dblas=accelerate\" >> "$GITHUB_ENV"
