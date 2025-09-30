@@ -145,6 +145,8 @@ jobs:
         run: |
           # use conda-forge compilers for a uniform experience across
           # a difficult set of targets
+          INSTALL_DIR=/Users/runner/miniforge3
+
           wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
           
           # Make the installer executable
@@ -152,9 +154,16 @@ jobs:
           
           # Run the installer in batch mode (-b) and specify the installation prefix (-p)
           # The -u flag is for updating an existing installation if it exists
-          ./Miniforge3.sh -b -u
-          which conda
-          
+          ./Miniforge3.sh -b -u -p "${INSTALL_DIR}"
+          eval "$("${INSTALL_DIR}/bin/conda" shell.$(basename $SHELL) hook)"
+          conda init "$(basename $SHELL)"
+
+          # Activate base environment for immediate use in this script
+          source "${INSTALL_DIR}/etc/profile.d/conda.sh"
+          conda activate base
+          conda install -y compilers
+          which gfortran
+
           if [[ ${{ matrix.buildplat[3] }} == 'accelerate' ]]; then
             echo CIBW_CONFIG_SETTINGS=\"setup-args=-Dblas=accelerate\" >> "$GITHUB_ENV"
 
