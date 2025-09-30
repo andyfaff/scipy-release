@@ -51,17 +51,17 @@ jobs:
         # should also be able to do multi-archs on a single entry, e.g.
         # [windows-2025, win*, "AMD64 x86"]. However, those two require a different compiler setup
         # so easier to separate out here.
-        - [ubuntu-22.04, manylinux, x86_64, "", ""]
-        - [ubuntu-22.04, musllinux, x86_64, "", ""]
-        - [ubuntu-24.04-arm, manylinux, aarch64, "", ""]
-        - [ubuntu-24.04-arm, musllinux, aarch64, "", ""]
-        - [macos-13, macosx, x86_64, openblas, "10.14"]
-        - [macos-13, macosx, x86_64, accelerate, "14.0"]
-        - [macos-14, macosx, arm64, openblas, "12.3"]
+#        - [ubuntu-22.04, manylinux, x86_64, "", ""]
+#        - [ubuntu-22.04, musllinux, x86_64, "", ""]
+#        - [ubuntu-24.04-arm, manylinux, aarch64, "", ""]
+#        - [ubuntu-24.04-arm, musllinux, aarch64, "", ""]
+#        - [macos-13, macosx, x86_64, openblas, "10.14"]
+#        - [macos-13, macosx, x86_64, accelerate, "14.0"]
+#        - [macos-14, macosx, arm64, openblas, "12.3"]
         - [macos-14, macosx, arm64, accelerate, "14.0"]
-        - [windows-2025, win, AMD64, "", ""]
-        - [windows-11-arm, win, ARM64, "", ""]
-        python: [["cp311", "3.11"], ["cp312", "3.12"], ["cp313", "3.13"], ["cp313t", "3.13"], ["cp314", "cp314"], ["cp314t", "cp314"]]
+#        - [windows-2025, win, AMD64, "", ""]
+#        - [windows-11-arm, win, ARM64, "", ""]
+        python: [["cp311", "3.11"]]#, ["cp312", "3.12"], ["cp313", "3.13"], ["cp313t", "3.13"], ["cp314", "cp314"], ["cp314t", "cp314"]]
         # python[0] is used to specify the python versions made by cibuildwheel
 
     steps:
@@ -143,6 +143,18 @@ jobs:
       - name: Setup macOS
         if: startsWith( matrix.buildplat[0], 'macos-' )
         run: |
+          # use conda-forge compilers for a uniform experience across
+          # a difficult set of targets
+          wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+          
+          # Make the installer executable
+          chmod +x Miniforge3.sh
+          
+          # Run the installer in batch mode (-b) and specify the installation prefix (-p)
+          # The -u flag is for updating an existing installation if it exists
+          ./Miniforge3.sh -b -u
+          which conda
+          
           if [[ ${{ matrix.buildplat[3] }} == 'accelerate' ]]; then
             echo CIBW_CONFIG_SETTINGS=\"setup-args=-Dblas=accelerate\" >> "$GITHUB_ENV"
 
