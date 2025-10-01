@@ -162,13 +162,6 @@ jobs:
           source "${INSTALL_DIR}/etc/profile.d/conda.sh"
           conda activate base
           conda install -q -y compilers
-          
-          #          # make conda binaries available on path, so they're available from the cibuildwheel invocation
-          #          PTH=$INSTALL_DIR/bin:$INSTALL_DIR/condabin:$PATH
-          #          echo "PATH=$PTH" >> $GITHUB_ENV          
-          
-          # CIBW="source \"${INSTALL_DIR}/etc/profile.d/conda.sh\" && conda activate base && which gfortran"
-          #echo "CIBW_BEFORE_ALL=$CIBW" >> $GITHUB_ENV
 
           if [[ ${{ matrix.buildplat[3] }} == 'accelerate' ]]; then
             echo CIBW_CONFIG_SETTINGS=\"setup-args=-Dblas=accelerate\" >> "$GITHUB_ENV"
@@ -189,17 +182,26 @@ jobs:
       
           echo "CIBW_REPAIR_WHEEL_COMMAND_MACOS=$CIBW" >> "$GITHUB_ENV"
 
-      - name: Build wheels
-        uses: pypa/cibuildwheel@ffd835cef18fa11522f608fc0fa973b89f5ddc87 # v3.1.0
+      - name: Build Wheels
         shell: bash -el {0}
-        env:
-          CIBW_BUILD: ${{ matrix.python[0] }}-${{ matrix.buildplat[1] }}*
-          CIBW_ARCHS: ${{ matrix.buildplat[2] }}
-          CIBW_ENABLE: cpython-freethreading cpython-prerelease
-        with:
-          package-dir: scipy-src
-          output-dir: dist
-          config-file: cibuildwheel.toml
+        run: |
+          pip install cibuildwheel
+          which conda
+          export CIBW_BUILD=${{ matrix.python[0] }}-${{ matrix.buildplat[1] }}*
+          export CIBW_ARCHS=${{ matrix.buildplat[2] }}
+          export CIBW_ENABLE="cpython-freethreading cpython-prerelease"
+          cibuildwheel --output-dir=dist --config-file=cibuildwheel.toml scipy-src
+
+#      - name: Build wheels
+#        uses: pypa/cibuildwheel@ffd835cef18fa11522f608fc0fa973b89f5ddc87 # v3.1.0
+#        env:
+#          CIBW_BUILD: ${{ matrix.python[0] }}-${{ matrix.buildplat[1] }}*
+#          CIBW_ARCHS: ${{ matrix.buildplat[2] }}
+#          CIBW_ENABLE: cpython-freethreading cpython-prerelease
+#        with:
+#          package-dir: scipy-src
+#          output-dir: dist
+#          config-file: cibuildwheel.toml
 
       - name: Rename macOS wheels
         if: startsWith( matrix.buildplat[0], 'macos-' )
