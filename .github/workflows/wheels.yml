@@ -164,6 +164,7 @@ jobs:
           conda create -q -y -n build
           conda install -q -y compilers
           echo "conda activate build" >> $HOME/.bash_profile
+          cat $HOME/.bash_profile
           echo "conda activate build" >> $HOME/.bashrc
 
           if [[ ${{ matrix.buildplat[3] }} == 'accelerate' ]]; then
@@ -205,6 +206,8 @@ jobs:
       - name: Build Wheels
         shell: bash -el {0}
         run: |
+          printenv
+          conda info
           pip install cibuildwheel
           export CIBW_BUILD=${{ matrix.python[0] }}-${{ matrix.buildplat[1] }}*
           export CIBW_ARCHS=${{ matrix.buildplat[2] }}
