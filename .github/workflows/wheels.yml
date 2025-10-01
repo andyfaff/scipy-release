@@ -56,7 +56,7 @@ jobs:
 #        - [ubuntu-24.04-arm, manylinux, aarch64, "", ""]
 #        - [ubuntu-24.04-arm, musllinux, aarch64, "", ""]
         - [macos-13, macosx, x86_64, openblas, "10.14"]
-        - [macos-13, macosx, x86_64, accelerate, "14.0"]
+        - [macos-15-intel, macosx, x86_64, accelerate, "14.0"]
         - [macos-14, macosx, arm64, openblas, "12.3"]
         - [macos-14, macosx, arm64, accelerate, "14.0"]
 #        - [windows-2025, win, AMD64, "", ""]
@@ -143,31 +143,35 @@ jobs:
       - name: Setup macOS
         if: startsWith( matrix.buildplat[0], 'macos-' )
         run: |
-          # use conda-forge compilers for a uniform experience across
-          # a difficult set of targets
-          INSTALL_DIR=/Users/runner/miniforge3
-
-          wget -q -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-          
-          # Make the installer executable
-          chmod +x Miniforge3.sh
-          
-          # Run the installer in batch mode (-b) and specify the installation prefix (-p)
-          # The -u flag is for updating an existing installation if it exists
-          ./Miniforge3.sh -b -u -p "${INSTALL_DIR}"
-
-          source "${INSTALL_DIR}/etc/profile.d/conda.sh"
-          conda init
-          conda create -q -y -n build compilers
-          echo "conda activate build" >> $HOME/.bash_profile
-          cat $HOME/.bash_profile
-
           if [[ ${{ matrix.buildplat[3] }} == 'accelerate' ]]; then
             echo CIBW_CONFIG_SETTINGS=\"setup-args=-Dblas=accelerate\" >> "$GITHUB_ENV"
   
+            # use preinstalled gfortran for Accelerate builds
+            ln -s $(which gfortran-13) gfortran
+            export PATH=$PWD:$PATH
+            echo "PATH=$PATH" >> "$GITHUB_ENV"
+          
             # Builds with Accelerate only target macOS>=14.0
             CIBW_ENV="CIBW_ENVIRONMENT_MACOS=MACOSX_DEPLOYMENT_TARGET=14.0 INSTALL_OPENBLAS=false"
           else
+            # use conda-forge compilers the difficult targets
+            INSTALL_DIR=/Users/runner/miniforge3
+  
+            wget -q -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+            
+            # Make the installer executable
+            chmod +x Miniforge3.sh
+            
+            # Run the installer in batch mode (-b) and specify the installation prefix (-p)
+            # The -u flag is for updating an existing installation if it exists
+            ./Miniforge3.sh -b -u -p "${INSTALL_DIR}"
+  
+            source "${INSTALL_DIR}/etc/profile.d/conda.sh"
+            conda init
+            conda create -q -y -n build compilers
+            echo "conda activate build" >> $HOME/.bash_profile
+            cat $HOME/.bash_profile
+            
             CIBW_ENV="CIBW_ENVIRONMENT_MACOS=PKG_CONFIG_PATH=$PWD/.openblas \
             MACOSX_DEPLOYMENT_TARGET=${{ matrix.buildplat[4] }}"
           fi
