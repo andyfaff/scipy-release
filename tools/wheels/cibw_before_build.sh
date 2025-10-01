@@ -3,6 +3,8 @@ set -xe
 PROJECT_DIR="${1:-$PWD}"
 SCIPY_SRC_DIR="${1:-$PWD}/scipy-src"
 
+printenv
+which conda
 
 # Update license
 echo "" >> $SCIPY_SRC_DIR/LICENSE.txt
