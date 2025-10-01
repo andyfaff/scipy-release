@@ -155,17 +155,14 @@ jobs:
           # Run the installer in batch mode (-b) and specify the installation prefix (-p)
           # The -u flag is for updating an existing installation if it exists
           ./Miniforge3.sh -b -u -p "${INSTALL_DIR}"
-          eval "$("${INSTALL_DIR}/bin/conda" shell.$(basename $SHELL) hook)"
-          conda init "$(basename $SHELL)"
 
-          # Activate base environment for immediate use in this script
           source "${INSTALL_DIR}/etc/profile.d/conda.sh"
+          conda init
           conda activate base
           conda create -q -y -n build
           conda install -q -y compilers
           echo "conda activate build" >> $HOME/.bash_profile
           cat $HOME/.bash_profile
-          echo "conda activate build" >> $HOME/.bashrc
 
           if [[ ${{ matrix.buildplat[3] }} == 'accelerate' ]]; then
             echo CIBW_CONFIG_SETTINGS=\"setup-args=-Dblas=accelerate\" >> "$GITHUB_ENV"
