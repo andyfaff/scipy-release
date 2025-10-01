@@ -57,7 +57,7 @@ jobs:
 #        - [ubuntu-24.04-arm, musllinux, aarch64, "", ""]
 #        - [macos-13, macosx, x86_64, openblas, "10.14"]
         - [macos-13, macosx, x86_64, accelerate, "14.0"]
-#        - [macos-14, macosx, arm64, openblas, "12.3"]
+        - [macos-14, macosx, arm64, openblas, "12.3"]
 #        - [macos-14, macosx, arm64, accelerate, "14.0"]
 #        - [windows-2025, win, AMD64, "", ""]
 #        - [windows-11-arm, win, ARM64, "", ""]
@@ -185,14 +185,24 @@ jobs:
             CIBW+=" && mv {dest_dir}/\$(basename {wheel}) \
               {dest_dir}/\$(echo \$(basename {wheel}) | sed 's/14_0/13_0/')"
           fi
-      
+          
+          # macos-arm64-openblas wheels that target macos-12 need a
+          # MACOS_DEPLOYMENT_TARGET of 12.3 otherwise delocate complains.
+          # Unclear of cause, possibly build tool related.
+          # This results in wheels that have 12_3 in their name. Since Python
+          # has no concept of minor OS versions in packaging land rename the
+          # wheel back to 12.
+          if [[ ${{ matrix.buildplat[0] }} == 'macos-14' && ${{ matrix.buildplat[4] }} == '12.3' ]]; then
+            CIBW+=" && echo \$(ls {dest_dir}) && \
+            mv {dest_dir}/*.whl \$(find {dest_dir} -type f -name '*.whl' | sed 's/12_3/12_0/')"
+          fi
+          
           echo "CIBW_REPAIR_WHEEL_COMMAND_MACOS=$CIBW" >> "$GITHUB_ENV"
 
       - name: Build Wheels
         shell: bash -el {0}
         run: |
           pip install cibuildwheel
-          which conda
           export CIBW_BUILD=${{ matrix.python[0] }}-${{ matrix.buildplat[1] }}*
           export CIBW_ARCHS=${{ matrix.buildplat[2] }}
           export CIBW_ENABLE="cpython-freethreading cpython-prerelease"
