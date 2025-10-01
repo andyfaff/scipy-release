@@ -143,6 +143,7 @@ jobs:
       - name: Setup macOS
         if: startsWith( matrix.buildplat[0], 'macos-' )
         run: |
+          echo $SHELL
           # use conda-forge compilers for a uniform experience across
           # a difficult set of targets
           INSTALL_DIR=/Users/runner/miniforge3
