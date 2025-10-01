@@ -55,8 +55,8 @@ jobs:
 #        - [ubuntu-22.04, musllinux, x86_64, "", ""]
 #        - [ubuntu-24.04-arm, manylinux, aarch64, "", ""]
 #        - [ubuntu-24.04-arm, musllinux, aarch64, "", ""]
-        - [macos-13, macosx, x86_64, openblas, "10.14"]
-#        - [macos-13, macosx, x86_64, accelerate, "14.0"]
+#        - [macos-13, macosx, x86_64, openblas, "10.14"]
+        - [macos-13, macosx, x86_64, accelerate, "14.0"]
 #        - [macos-14, macosx, arm64, openblas, "12.3"]
 #        - [macos-14, macosx, arm64, accelerate, "14.0"]
 #        - [windows-2025, win, AMD64, "", ""]
@@ -179,6 +179,12 @@ jobs:
             $PREFIX delocate-wheel -v $EXCLUDE --require-archs \
             {delocate_archs} -w {dest_dir} {wheel} && echo "-----------" &&\
             delocate-listdeps -d {dest_dir}/*.whl"
+      
+          # Rename x86 Accelerate wheel to test on macOS 13 runner
+          if [[ ${{ matrix.buildplat[0] }} == 'macos-13' && ${{ matrix.buildplat[4] }} == '14.0' ]]; then
+            CIBW+=" && mv {dest_dir}/\$(basename {wheel}) \
+              {dest_dir}/\$(echo \$(basename {wheel}) | sed 's/14_0/13_0/')"
+          fi
       
           echo "CIBW_REPAIR_WHEEL_COMMAND_MACOS=$CIBW" >> "$GITHUB_ENV"
 
