@@ -178,7 +178,9 @@ jobs:
           echo "$CIBW_ENV" >> "$GITHUB_ENV"
 
           PREFIX=DYLD_LIBRARY_PATH="\$(dirname \$(gfortran --print-file-name libgfortran.dylib))"
-          CIBW="$PREFIX delocate-wheel -v $EXCLUDE --require-archs {delocate_archs} -w {dest_dir} {wheel}"
+          CIBW="$PREFIX delocate-wheel -v $EXCLUDE --require-archs \
+            {delocate_archs} -w {dest_dir} {wheel} && echo "-----------" &&\
+            delocate-listdeps -d {dest_dir}/*.whl"
 #
 #          # macos-arm64-openblas wheels that target macos-12 need a
 #          # MACOS_DEPLOYMENT_TARGET of 12.3 otherwise delocate complains.
@@ -191,7 +193,7 @@ jobs:
 #            mv {dest_dir}/*.whl \$(find {dest_dir} -type f -name '*.whl' | sed 's/12_3/12_0/')"
 #          fi
 #
-          echo "CIBW_REPAIR_WHEEL_COMMAND_MACOS=$CIBW" >> "$GITHUB_ENV"
+          echo "CIBW_REPAIR_WHEEL_COMMAND_MACOS=$CIBW" >> $GITHUB_ENV
 
       - name: Build Wheels
         shell: bash -el {0}
