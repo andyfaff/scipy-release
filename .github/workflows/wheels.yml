@@ -191,7 +191,7 @@ jobs:
 #            mv {dest_dir}/*.whl \$(find {dest_dir} -type f -name '*.whl' | sed 's/12_3/12_0/')"
 #          fi
 #
-#          echo "CIBW_REPAIR_WHEEL_COMMAND_MACOS=$CIBW" >> "$GITHUB_ENV"
+          echo "CIBW_REPAIR_WHEEL_COMMAND_MACOS=$CIBW" >> "$GITHUB_ENV"
 
       - name: Build Wheels
         shell: bash -el {0}
