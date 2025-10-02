@@ -177,24 +177,24 @@ jobs:
           fi
           echo "$CIBW_ENV" >> "$GITHUB_ENV"
 
-          PREFIX=DYLD_LIBRARY_PATH="\$(dirname \$(gfortran --print-file-name libgfortran.dylib))"
-          CIBW="$PREFIX delocate-listdeps -d {wheel} && echo "-----------" &&\
-            $PREFIX delocate-wheel -v $EXCLUDE --require-archs \
-            {delocate_archs} -w {dest_dir} {wheel} && echo "-----------" &&\
-            delocate-listdeps -d {dest_dir}/*.whl"
-          
-          # macos-arm64-openblas wheels that target macos-12 need a
-          # MACOS_DEPLOYMENT_TARGET of 12.3 otherwise delocate complains.
-          # Unclear of cause, possibly build tool related.
-          # This results in wheels that have 12_3 in their name. Since Python
-          # has no concept of minor OS versions in packaging land rename the
-          # wheel back to 12.
-          if [[ ${{ matrix.buildplat[0] }} == 'macos-14' && ${{ matrix.buildplat[4] }} == '12.3' ]]; then
-            CIBW+=" && echo \$(ls {dest_dir}) && \
-            mv {dest_dir}/*.whl \$(find {dest_dir} -type f -name '*.whl' | sed 's/12_3/12_0/')"
-          fi
-          
-          echo "CIBW_REPAIR_WHEEL_COMMAND_MACOS=$CIBW" >> "$GITHUB_ENV"
+#          PREFIX=DYLD_LIBRARY_PATH="\$(dirname \$(gfortran --print-file-name libgfortran.dylib))"
+#          CIBW="$PREFIX delocate-listdeps -d {wheel} && echo "-----------" &&\
+#            $PREFIX delocate-wheel -v $EXCLUDE --require-archs \
+#            {delocate_archs} -w {dest_dir} {wheel} && echo "-----------" &&\
+#            delocate-listdeps -d {dest_dir}/*.whl"
+#
+#          # macos-arm64-openblas wheels that target macos-12 need a
+#          # MACOS_DEPLOYMENT_TARGET of 12.3 otherwise delocate complains.
+#          # Unclear of cause, possibly build tool related.
+#          # This results in wheels that have 12_3 in their name. Since Python
+#          # has no concept of minor OS versions in packaging land rename the
+#          # wheel back to 12.
+#          if [[ ${{ matrix.buildplat[0] }} == 'macos-14' && ${{ matrix.buildplat[4] }} == '12.3' ]]; then
+#            CIBW+=" && echo \$(ls {dest_dir}) && \
+#            mv {dest_dir}/*.whl \$(find {dest_dir} -type f -name '*.whl' | sed 's/12_3/12_0/')"
+#          fi
+#
+#          echo "CIBW_REPAIR_WHEEL_COMMAND_MACOS=$CIBW" >> "$GITHUB_ENV"
 
       - name: Build Wheels
         shell: bash -el {0}
@@ -204,17 +204,6 @@ jobs:
           export CIBW_ARCHS=${{ matrix.buildplat[2] }}
           export CIBW_ENABLE="cpython-freethreading cpython-prerelease"
           cibuildwheel --output-dir=dist --config-file=cibuildwheel.toml scipy-src
-
-#      - name: Build wheels
-#        uses: pypa/cibuildwheel@ffd835cef18fa11522f608fc0fa973b89f5ddc87 # v3.1.0
-#        env:
-#          CIBW_BUILD: ${{ matrix.python[0] }}-${{ matrix.buildplat[1] }}*
-#          CIBW_ARCHS: ${{ matrix.buildplat[2] }}
-#          CIBW_ENABLE: cpython-freethreading cpython-prerelease
-#        with:
-#          package-dir: scipy-src
-#          output-dir: dist
-#          config-file: cibuildwheel.toml
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
