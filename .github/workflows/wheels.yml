@@ -59,9 +59,9 @@ jobs:
         - [macos-15-intel, macosx, x86_64, accelerate, "14.0"]
         - [macos-14, macosx, arm64, openblas, "12.3"]
         - [macos-14, macosx, arm64, accelerate, "14.0"]
-#        - [windows-2025, win, AMD64, "", ""]
-#        - [windows-11-arm, win, ARM64, "", ""]
-        python: [["cp311", "3.11"]]#, ["cp312", "3.12"], ["cp313", "3.13"], ["cp313t", "3.13"], ["cp314", "cp314"], ["cp314t", "cp314"]]
+        - [windows-2025, win, AMD64, "", ""]
+        - [windows-11-arm, win, ARM64, "", ""]
+        python: [["cp311", "3.11"], ["cp312", "3.12"], ["cp313", "3.13"], ["cp313t", "3.13"], ["cp314", "cp314"], ["cp314t", "cp314"]]
         # python[0] is used to specify the python versions made by cibuildwheel
 
     steps:
@@ -119,14 +119,10 @@ jobs:
       #     In addition, we can't use Accelerate for < 14 because the library had bugs.
       #     This means OpenBLAS has to be used.
       # - x86_64, accelerate, >=14.0
-      #     Complicated because x86_64 is only available on the macos-13 image, which
-      #     is deprecated. It's also made difficult to test on macos-13 because the
-      #     deployment target is 14. This means one has to rename the wheel to 13
-      #     for testing, then after the build you have to do a further name change
-      #     of the wheel to 14.
+      #     Complicated because x86_64 is only available on the macos-15-intel image.
       # - x86_64, openblas, "10.14"
-      #     Complicated because x86_64 is only available on the macos-13 image, which
-      #     is deprecated.
+      #     Complicated because x86_64 is only available on the macos-15-intel image.
+      #     Needs an older compiler.
       # - arm64, openblas, "12.3"
       #     Complicated because MACOS_DEPLOYMENT_TARGET has to be set to 12.3 (there's
       #     some reason why we don't support <12.3), which results in 12_3 in the wheel
