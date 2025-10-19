@@ -231,7 +231,7 @@ jobs:
   build_sdist:
     name: Build sdist
     runs-on: ubuntu-latest
-    if: github.repository == 'scipy/scipy'
+    if: github.repository == 'scipy/scipy-release'
 
     steps:
       - name: Checkout scipy
