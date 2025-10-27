@@ -155,6 +155,7 @@ jobs:
             # Builds with Accelerate only target macOS>=14.0
             CIBW_ENV="CIBW_ENVIRONMENT_MACOS=MACOSX_DEPLOYMENT_TARGET=14.0 INSTALL_OPENBLAS=false"
           else
+            which clang
             # use conda-forge compilers the difficult targets
             INSTALL_DIR=/Users/runner/miniforge3
   
