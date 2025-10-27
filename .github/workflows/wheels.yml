@@ -171,7 +171,9 @@ jobs:
             source "${INSTALL_DIR}/etc/profile.d/conda.sh"
             conda init
             conda create -q -y -n build compilers
-            echo "conda activate build" >> $HOME/.bash_profile
+            echo 'conda activate build' >> $HOME/.bash_profile
+            # make sure OS clang is picked up first, not conda-forge clang 
+            echo 'PATH=/usr/bin:$PATH' >> $HOME/.bash_profile
           
             cat $HOME/.bash_profile
             
@@ -187,7 +189,6 @@ jobs:
       - name: Build Wheels
         shell: bash -el {0}
         run: |
-          export PATH=/usr/bin:$PATH
           pip install cibuildwheel
           export CIBW_BUILD=${{ matrix.python[0] }}-${{ matrix.buildplat[1] }}*
           export CIBW_ARCHS=${{ matrix.buildplat[2] }}
