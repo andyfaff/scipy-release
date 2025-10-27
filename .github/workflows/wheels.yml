@@ -173,9 +173,6 @@ jobs:
             conda create -q -y -n build compilers
             echo "conda activate build" >> $HOME/.bash_profile
           
-            # make sure OS clang is picked up first, not conda-forge clang 
-            echo "PATH=/usr/bin:$PATH" >> $HOME/.bash_profile
-          
             cat $HOME/.bash_profile
             
             CIBW_ENV="CIBW_ENVIRONMENT_MACOS=PKG_CONFIG_PATH=$PWD/.openblas \
@@ -190,9 +187,7 @@ jobs:
       - name: Build Wheels
         shell: bash -el {0}
         run: |
-          which clang
-          echo $PATH
-          printenv
+          export PATH=/usr/bin:$PATH
           pip install cibuildwheel
           export CIBW_BUILD=${{ matrix.python[0] }}-${{ matrix.buildplat[1] }}*
           export CIBW_ARCHS=${{ matrix.buildplat[2] }}
