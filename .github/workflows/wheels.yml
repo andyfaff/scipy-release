@@ -5,6 +5,7 @@ env:
   # to build wheels. This is normally set to `main` in the main branch of this
   # repo, and to a tag name (e.g., `v2.3.2`) on a release branch.
   SOURCE_REF_TO_BUILD: main
+  UV_VERSION: "0.12.5"
 
 on:
   schedule:
@@ -84,6 +85,16 @@ jobs:
         with:
           python-version: 3.13
 
+      # Used in cibw_before_build to install pinned build dependencies
+      # Note that cibuildwheel provides it in the Linux images, so this install
+      # is only useful on macOS/windows
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          # can't use checksum here, because there are different packages
+          # for different OS
+          version: ${{ env.UV_VERSION }}
+
       - name: Setup windows
         if: matrix.buildplat[1] == 'win'
         run: |
@@ -127,6 +138,7 @@ jobs:
           CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}*
           CIBW_ARCHS: ${{ matrix.buildplat[2] }}
           CIBW_ENABLE: cpython-prerelease
+          CIBW_DEPENDENCY_VERSIONS: pinned
         with:
            package-dir: scipy-src
            output-dir: dist
@@ -151,17 +163,29 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Install micromamba
-        uses: mamba-org/setup-micromamba@ce51e99f4bb8a82ab7158c4dc59ef4634c59c4f9 # v3.1.0
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          # For installation of anaconda-client, required for upload to anaconda.org
-          init-shell: bash
-          environment-name: upload-env
-          create-args: >-
-            anaconda-client
+          python-version: 3.13
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
+
+      - name: Install anaconda-client
+        # The anaconda-client and dependencies are given the upload token, as well as
+        # the built wheels. Using a hash-pinned anaconda-client ensures that we're less
+        # exposed to supply chain attacks that might manipulate either the token or the
+        # wheels.
+        # Regenerate with:
+        #   echo "anaconda-client==<version>" | uv pip compile - --format pylock.toml \
+        #       --python 3.13 --python-platform x86_64-unknown-linux-gnu \
+        #       -o requirements/pylock.anaconda-client.toml
+        run: uv pip install --system --no-deps --require-hashes -r requirements/pylock.anaconda-client.toml
 
       - name: Upload to anaconda.org
-        shell: bash -el {0}  # required for micromamba
         env:
           TOKEN: ${{ secrets.SCIPY_NIGHTLY_UPLOAD_TOKEN }}
         run: |
@@ -172,45 +196,82 @@ jobs:
     name: Build sdist
     runs-on: ubuntu-latest
     if: github.repository == 'scipy/scipy-release'
+    env:
+      OPENBLAS: openblas32
 
     steps:
+      - name: Checkout scipy-release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: scipy/scipy
-          submodules: true
           ref: ${{ env.SOURCE_REF_TO_BUILD }}
+          path: scipy-src
+          submodules: true
           persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
 
       - name: Build sdist
         run: |
-          python -m pip install -U pip build
+          # use uv and a lock file to pin down all dependencies for the sdist build
+          # copy uv.lock from scipy-release into scipy src directory
+          cp uv.lock scipy-src
+          pushd scipy-src
+
+          # installs the 'build' and 'openblas32' dependency groups. Install should be into
+          # a .venv in the same directory
+          # --frozen : uses specification in uv.lock as source of truth
+          # --no-install-project : don't try to build scipy
+          # only-managed: force uv to use a managed python
+          uv sync --python-preference only-managed --frozen --no-install-project --no-default-groups --group build --group $OPENBLAS
 
           # need openblas even for the sdist build
-          OPENBLAS=openblas32
-          pkgconf_path=$GITHUB_WORKSPACE/.openblas
+          pkgconf_path=$GITHUB_WORKSPACE/scipy-src/.openblas
 
           rm -rf $pkgconf_path
           mkdir -p $pkgconf_path
 
-          python -m pip install --group $OPENBLAS
-          python -c "import scipy_${OPENBLAS}; print(scipy_${OPENBLAS}.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
+          # --no-project : don't want uv to install project first
+          uv run --no-reinstall --no-project --managed-python python -c "import scipy_${OPENBLAS}; print(scipy_${OPENBLAS}.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
           export PKG_CONFIG_PATH=$pkgconf_path
           echo "PKG_CONFIG_PATH=$pkgconf_path" >> "$GITHUB_ENV"
 
-          python -m build --sdist
+          uv build --sdist --no-build-isolation .
+          popd
 
       - name: Test the sdist
         run: |
-          python -m pip install -v dist/*.gz
-          pip install pytest hypothesis pooch
-          cd .. # Can't import scipy within scipy src directory
+          pushd scipy-src
+          
+          # export the build, test and openblas requirements.
+          # no-emit-project: the project is excluded, but all of its dependencies remain
+          #                  included.
+          uv export --format pylock.toml --output-file dist/pylock.toml -q --no-emit-project --no-default-groups --group build --group test-core --group openblas32
+
+          # build and install the sdist in a venv.
+          cd dist
+          # no-config: Avoid discovering configuration files (`pyproject.toml`, `uv.toml`)
+          # no-project: Avoid discovering a project or workspace
+          uv venv test --no-config --no-project
+          source test/bin/activate
+          # requires pip > 26.1 to read a pylock file
+          uv pip install --no-deps --require-hashes -r pylock.toml
+          uv pip install --no-deps --no-build-isolation -v *.gz
           python -c "import scipy, sys; print(scipy.__version__); sys.exit(scipy.test() is False)"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sdist
-          path: ./dist/*
+          path: scipy-src/dist/*.tar.gz
 
 # -------------------------------------------------------------------------------------
   testpypi-publish:
