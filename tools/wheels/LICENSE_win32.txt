@@ -123,6 +123,29 @@ License: GPL-3.0-or-later WITH GCC-exception-3.1
   <http://www.gnu.org/licenses/>.
 
 
+Name: Microsoft Visual C++ Runtime Library
+Files: scipy.libs\msvcp140*.dll
+Description: bundled as a dynamically linked library. The extension modules are
+             built against the MSVC C++ standard library, which - unlike
+             vcruntime140.dll - is not part of Windows and is not shipped with
+             CPython, so it is vendored here. delvewheel renames the file to
+             avoid clashes with other copies loaded into the same process; the
+             file contents are bit-for-bit unmodified, as evidenced by its
+             intact Microsoft Authenticode signature.
+Availability: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
+License: Microsoft Visual Studio Distributable Code terms
+  Copyright (c) Microsoft Corporation.  All rights reserved.
+
+  Redistributed in unmodified object code form as permitted by the
+  "Distributable Code" section of the Microsoft Visual Studio license terms,
+  under which this file is listed on the accompanying REDIST list.
+
+  Visual Studio license terms:
+    <https://visualstudio.microsoft.com/license-terms/>
+  REDIST list:
+    <https://aka.ms/vs/17/redistribution>
+
+
 ----
 
 Full text of license texts referred to above follows (that they are
