@@ -14,9 +14,11 @@ scipy/scipy#14998 and scipy/scipy#17191.
 This is a no-op on non-Windows platforms.
 
 """
+
 import pathlib
 import sys
 import argparse
+import subprocess
 
 
 def main():
@@ -47,7 +49,61 @@ def main():
         sys.exit(1)
 
     print(f"Found vendored MSVC C++ runtime: {vendored}")
+
+    # now check that the runtime is still correctly signed
+    verified = verify_microsoft_signature(libs_path / vendored[0])
+    if not verified:
+        print("The bundled msvcp140 DLL does not have a valid signature.")
+        sys.exit(1)
+
+    print("The signature of the vendored MSVC C++ runtime has been verified")
+
     sys.exit(0)
+
+
+def verify_microsoft_signature(file_path):
+    # This fetches the signature status and the Subject name of the signer
+    ps_command = (
+        f' $sig = Get-AuthenticodeSignature "{file_path}"; '
+        f'Write-Output "$($sig.Status)|$($sig.SignerCertificate.Subject)" '
+    )
+
+    try:
+        result = subprocess.run(
+            ["powershell", "-Command", ps_command],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Parse output (format will be: Status|Subject)
+        output = result.stdout.strip()
+        if not output or "|" not in output:
+            print("Error: Could not retrieve file signature info.")
+            return False
+
+        status, subject = output.split("|", 1)
+
+        # Check if the cryptographic signature is structurally intact
+        if status != "Valid":
+            print(
+                f"Warning: File signature status is '{status}'. The file has been modified."
+            )
+            return False
+
+        # Check if the signer identity is actually Microsoft
+        if "Microsoft Corporation" in subject or "CN=Microsoft" in subject:
+            print("Success: File is unmodified and authentically signed by Microsoft!")
+            return True
+        else:
+            print(
+                f"Warning: Valid signature found, but it belongs to someone else: {subject}"
+            )
+            return False
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing verification check: {e}")
+        return False
 
 
 if __name__ == "__main__":
