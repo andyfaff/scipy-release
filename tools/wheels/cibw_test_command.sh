@@ -9,6 +9,9 @@ PROJECT_DIR="$1"
 # Check at start because the actual tests take quite a long time to run
 python $PROJECT_DIR/tools/wheels/check_license.py
 
+# Check that Windows wheels vendor the MSVC C++ runtime (no-op elsewhere)
+python $PROJECT_DIR/tools/wheels/check_msvc_runtime.py
+
 
 FREE_THREADED_BUILD="$(python -c"import sysconfig; print(bool(sysconfig.get_config_var('Py_GIL_DISABLED')))")"
 if [[ $FREE_THREADED_BUILD == "True" ]]; then
