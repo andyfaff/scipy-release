@@ -51,6 +51,8 @@ def main():
     print(f"Found vendored MSVC C++ runtime: {vendored}")
 
     # now check that the runtime is still correctly signed
+    print("The msvcp path is", libs_path / vendored[0])
+
     verified = verify_microsoft_signature(libs_path / vendored[0])
     if not verified:
         print("The bundled msvcp140 DLL does not have a valid signature.")
