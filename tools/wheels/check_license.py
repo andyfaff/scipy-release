@@ -22,6 +22,13 @@ def check_text(text):
     return ok
 
 
+def check_windows_text(text):
+    # Windows wheels vendor the MSVC C++ runtime (delvewheel renames it to
+    # msvcp140-<hash>.dll). Make sure the notice added by
+    # tools/wheels/LICENSE_win32.txt survives into the wheel.
+    return "msvcp140" in text.lower()
+
+
 def main():
     p = argparse.ArgumentParser(usage=__doc__.rstrip())
     p.add_argument("module", nargs="?", default="scipy")
@@ -48,6 +55,14 @@ def main():
         print(
             f"ERROR: License text {license_txt} does not contain expected "
             "text fragments\n"
+        )
+        print(text)
+        sys.exit(1)
+
+    if sys.platform == "win32" and not check_windows_text(text):
+        print(
+            f"ERROR: License text {license_txt} does not mention the bundled "
+            "MSVC runtime (msvcp140)\n"
         )
         print(text)
         sys.exit(1)
