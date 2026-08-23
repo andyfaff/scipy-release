@@ -62,7 +62,7 @@ jobs:
         - [macos-14, macosx, arm64, accelerate, "14.0"]
         - [windows-2025, win, AMD64, "", ""]
         - [windows-11-arm, win, ARM64, "", ""]
-        python: ["cp312"]#, "cp313", "cp314", "cp314t", "cp315", "cp315t"]
+        python: ["cp312", "cp313", "cp314", "cp314t", "cp315", "cp315t"]
 
     steps:
       - name: Checkout scipy-release
