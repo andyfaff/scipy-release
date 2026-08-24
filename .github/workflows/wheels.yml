@@ -163,33 +163,11 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Setup Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Upload nightly wheel
+        uses: scientific-python/upload-nightly-action@e76cfec8a4611fd02808a801b0ff5a7d7c1b2d99 # 0.6.4
         with:
-          python-version: 3.13
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          version: ${{ env.UV_VERSION }}
-          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
-
-      - name: Install anaconda-client
-        # The anaconda-client and dependencies are given the upload token, as well as
-        # the built wheels. Using a hash-pinned anaconda-client ensures that we're less
-        # exposed to supply chain attacks that might manipulate either the token or the
-        # wheels.
-        # Regenerate with:
-        #   echo "anaconda-client==<version>" | uv pip compile - --format pylock.toml \
-        #       --python 3.13 --python-platform x86_64-unknown-linux-gnu \
-        #       -o requirements/pylock.anaconda-client.toml
-        run: uv pip install --system --no-deps --require-hashes -r requirements/pylock.anaconda-client.toml
-
-      - name: Upload to anaconda.org
-        env:
-          TOKEN: ${{ secrets.SCIPY_NIGHTLY_UPLOAD_TOKEN }}
-        run: |
-          anaconda -q -t ${TOKEN} upload --force -u scientific-python-nightly-wheels ./dist/*.whl
+          anaconda_nightly_upload_token: ${{ secrets.SCIPY_NIGHTLY_UPLOAD_TOKEN }}
+          artifacts_path: dist/
 
 # -------------------------------------------------------------------------------------
   build_sdist:
