@@ -6,6 +6,74 @@ fixes are very welcome, however CI jobs will not run for anyone who doesn't
 have commit access.
 
 
+## Updating the pinned dependencies
+
+Every build and test dependency is pinned, with hashes, in the `uv.lock` file at the root
+of this repository. That lock file is not generated from anything in *this* repository -
+it is generated from the `pyproject.toml` of the `scipy/scipy` commit that this branch
+builds (`SOURCE_REF_TO_BUILD` in `.github/workflows/wheels.yml`), and the build scripts
+install from it with `uv export --require-hashes`.
+
+Because of that coupling, the lock file goes stale whenever scipy's `pyproject.toml`
+changes - which includes its dependency groups, its `requires-python`, *and* its version
+string, since `uv.lock` records it. So a new lock file is needed at least on every
+version bump on `main` and for every release branch. The `check_lock` CI job runs
+`uv lock --check` before any wheels are built and fails with
+`The lockfile at uv.lock needs to be updated` when this happens.
+
+To regenerate it:
+
+```bash
+tools/update_lock.sh              # sync the lock to scipy's pyproject.toml
+tools/update_lock.sh --upgrade    # ... and also bump every pin to the latest release
+```
+
+This expects a `scipy/scipy` checkout at `../scipy`, at the commit named by
+`SOURCE_REF_TO_BUILD`; set `$SCIPY_SRC` if yours lives somewhere else. It errors out if
+your `uv` is older than CI's.
+
+Releases published within the last 7 days are ignored, so that a version published in the
+last few days can't end up in a build. uv writes that window into the lock file and
+`uv lock --check` only passes when given the *same* value, so it is hardcoded in two
+places that have to agree: the `check_lock` job in `wheels.yml`, and `EXCLUDE_NEWER` in
+`tools/update_lock.sh`. Change one and CI will reject the lock file you generate.
+
+One dependency is deliberately not in the lock file: `pkgconf` on Windows, which is still
+installed unpinned from `scipy-src/requirements/pkgconf.txt`. Closing that gap needs a
+`pkgconf` dependency group in scipy's `pyproject.toml`.
+
+
+## Reviewing a lock file change
+
+`uv.lock` covers *all* of scipy's dependency groups, including `doc`, `dev` and
+`typecheck`, so most of any lock diff has no bearing on the artifacts this repository
+produces - and at ~4000 lines it is not something to read line by line. Review the
+~30 packages that actually get installed instead:
+
+- The `check_lock` job writes exactly that list to its job summary on every run, so a PR
+  that touches `uv.lock` can be reviewed by comparing its summary against the one from the
+  most recent run on `main`. `tools/update_lock.sh` prints the same list locally.
+- To produce it yourself, from a scipy checkout with the candidate `uv.lock` copied in:
+
+  ```bash
+  uv export --frozen --no-hashes --no-emit-project --no-default-groups \
+      --group build --group openblas32 --group test-core
+  ```
+
+Worth checking on top of the version changes themselves:
+
+- That the lock file still matches the scipy commit being built - `uv lock --check
+  --exclude-newer "7 days"` from that checkout, which is what `check_lock` runs. It fails
+  with `The lockfile at uv.lock needs to be updated`.
+- That the diff contains no `source = { registry = ... }` pointing anywhere other than
+  `https://pypi.org/simple`, and no `source = { url = ... }` or `{ git = ... }` entries.
+- That `requires-python` and the `[options]` block at the top of the file are unchanged;
+  a dropped `exclude-newer-span` means the cooldown was silently skipped.
+- That the number of packages hasn't grown unexpectedly. A dependency group gaining a
+  package is normal; the build and test environments gaining one is not, and shows up in
+  the list above.
+
+
 ## Running CI jobs on your own fork
 
 To get CI to run on your own fork for changes in a branch named
