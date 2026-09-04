@@ -67,6 +67,10 @@ jobs:
 
       - name: Check lock file
         run: |
+          # If the uv.lock file in this repo goes out of date you can regenerate it by:
+          # uv lock --exclude-newer "7 days"
+          # You issue that command within the main repo, and copy it to this repo, submitting
+          # a PR to commit it.
           cp uv.lock scipy-src
           pushd scipy-src
           uv lock --check
