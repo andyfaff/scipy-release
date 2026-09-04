@@ -67,13 +67,11 @@ jobs:
 
       - name: Check lock file
         run: |
-          # If the uv.lock file in this repo goes out of date you can regenerate it by:
-          # uv lock --exclude-newer "7 days"
-          # You issue that command within the main repo, and copy it to this repo, submitting
-          # a PR to commit it.
+          # See CONTRIBUTING.md for how to regenerate uv.lock. The cooldown it was
+          # generated with is recorded in the file, and has to be repeated here.
           cp uv.lock scipy-src
           pushd scipy-src
-          uv lock --check
+          uv lock --check --exclude-newer "7 days"
 
       - name: Record the pins that will be used
         run: |
