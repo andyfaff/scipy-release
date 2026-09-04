@@ -61,19 +61,29 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          # can't use checksum here, because there are different packages
-          # for different OS
           version: ${{ env.UV_VERSION }}
+          # unlike build_wheels, this job is Linux-only, so we can pin the download too
+          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
 
       - name: Check lock file
         run: |
-          # If the uv.lock file in this repo goes out of date you can regenerate it by:
-          # uv lock --exclude-newer "7 days"
-          # You issue that command within the main repo, and copy it to this repo, submitting
-          # a PR to commit it.
-          cp uv.lock scipy-src
-          pushd scipy-src
-          uv lock --check
+          # pyproject.toml holds the dependency groups the builds install, copied out
+          # of scipy's; regenerating it here is what catches scipy changing them.
+          # See CONTRIBUTING.md for how to regenerate these files. The cooldown the
+          # lock was generated with is recorded in it, and has to be repeated here.
+          python3 tools/sync_dependency_groups.py scipy-src | diff -u pyproject.toml -
+          uv lock --check --exclude-newer "7 days"
+
+      - name: Record the pins that will be used
+        run: |
+          # the packages that actually get installed, for review of a lock file bump
+          {
+            echo '## Build and test dependencies for this run'
+            echo '```'
+            uv export --frozen --no-hashes --no-emit-project --no-default-groups \
+              --group build --group openblas32 --group test-core
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
 
   build_wheels:
@@ -211,6 +221,8 @@ jobs:
     name: Build sdist
     runs-on: ubuntu-latest
     if: github.repository == 'scipy/scipy-release'
+    # this job installs with `--frozen`, which skips the lock file check
+    needs: [check_lock]
     env:
       OPENBLAS: openblas32
 
@@ -237,18 +249,19 @@ jobs:
 
       - name: Build sdist
         run: |
-          # use uv and a lock file to pin down all dependencies for the sdist build
-          # copy uv.lock from scipy-release into scipy src directory
-          cp uv.lock scipy-src
-          pushd scipy-src
+          # use uv and a lock file to pin down all dependencies for the sdist build.
+          # The lock file lives in this repo, so sync from here; the environment goes
+          # into the scipy checkout, where `uv build --no-build-isolation` looks for it.
+          export UV_PROJECT_ENVIRONMENT=$GITHUB_WORKSPACE/scipy-src/.venv
 
-          # installs the 'build' and 'openblas32' dependency groups. Install should be into
-          # a .venv in the same directory
+          # installs the 'build' and 'openblas32' dependency groups
           # --frozen : uses specification in uv.lock as source of truth
-          # --no-install-project : don't try to build scipy
-          # only-managed: force uv to use a managed python
-          uv sync --python-preference only-managed --frozen --no-install-project --no-default-groups --group build --group $OPENBLAS
+          # only-managed: force uv to use a managed python. No version is requested, so
+          #     it's uv's default managed CPython - i.e. UV_VERSION decides which Python
+          #     the sdist is built and tested with; cibuildwheel isn't used in this job.
+          uv sync --python-preference only-managed --frozen --no-default-groups --group build --group $OPENBLAS
 
+          pushd scipy-src
           # need openblas even for the sdist build
           pkgconf_path=$GITHUB_WORKSPACE/scipy-src/.openblas
 
@@ -270,15 +283,16 @@ jobs:
           # export the build, test and openblas requirements.
           # no-emit-project: the project is excluded, but all of its dependencies remain
           #                  included.
-          uv export --format pylock.toml --output-file dist/pylock.toml -q --no-emit-project --no-default-groups --group build --group test-core --group openblas32
+          uv export --project $GITHUB_WORKSPACE --format pylock.toml --output-file dist/pylock.toml -q --frozen --no-emit-project --no-default-groups --group build --group test-core --group $OPENBLAS
 
           # build and install the sdist in a venv.
           cd dist
           # no-config: Avoid discovering configuration files (`pyproject.toml`, `uv.toml`)
-          # no-project: Avoid discovering a project or workspace
+          # no-project: Avoid discovering a project or workspace. This also means
+          #     requires-python isn't consulted; no python version is requested either,
+          #     so the venv reuses the interpreter `uv sync` installed above.
           uv venv test --no-config --no-project
           source test/bin/activate
-          # requires pip > 26.1 to read a pylock file
           uv pip install --no-deps --require-hashes -r pylock.toml
           uv pip install --no-deps --no-build-isolation -v *.gz
           python -c "import scipy, sys; print(scipy.__version__); sys.exit(scipy.test() is False)"
