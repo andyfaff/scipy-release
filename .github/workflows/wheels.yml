@@ -39,10 +39,38 @@ permissions:
   contents: read # to fetch code (actions/checkout)
 
 jobs:
+  check_lock:
+    name: Check uv.lock file
+    runs-on: ubuntu-latest
+    if: (github.repository == 'scipy/scipy-release' || github.repository == '')
+
+    steps:
+      - name: Checkout scipy-release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout scipy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: scipy/scipy
+          ref: ${{ env.SOURCE_REF_TO_BUILD }}
+          path: scipy-src
+          submodules: true
+          persist-credentials: false
+
+      - name: Check lock file
+        run: |
+          cp uv.lock scipy-src
+          pushd scipy-src
+          uv lock --check
+
+
   build_wheels:
     name: BLD > ${{ matrix.python }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}-${{ matrix.buildplat[3] }}
     runs-on: ${{ matrix.buildplat[0] }}
     if: (github.repository == 'scipy/scipy-release' || github.repository == '')
+    needs: [check_lock]
     strategy:
       # Ensure that a wheel builder finishes even if another fails
       fail-fast: false
