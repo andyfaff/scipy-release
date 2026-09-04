@@ -1,24 +1,23 @@
 #!/usr/bin/env bash
 #
-# Regenerate the `uv.lock` file in this repository.
+# Regenerate pyproject.toml and uv.lock in this repository.
 #
-# The lock file pins every build and test dependency used by the wheel and sdist builds.
-# It is generated from scipy's `pyproject.toml`, so it has to be regenerated whenever that
-# changes - including when scipy's version string is bumped, since `uv.lock` records it.
-# The `check_lock` CI job fails when the two drift apart.
+# pyproject.toml holds the dependency groups that the wheel and sdist builds install,
+# copied out of scipy's pyproject.toml; uv.lock pins them, with hashes. Both have to be
+# regenerated whenever scipy changes those groups - the `check_lock` CI job fails when
+# they drift apart.
 #
 # Expects a scipy checkout at ../scipy, at the commit this branch builds
 # (`SOURCE_REF_TO_BUILD` in .github/workflows/wheels.yml). Override with $SCIPY_SRC.
 #
 # Usage:
 #
-#   tools/update_lock.sh                            # sync the lock to pyproject.toml
+#   tools/update_lock.sh                            # sync to scipy's groups
 #   tools/update_lock.sh --upgrade                  # ... and bump every pin to latest
 #   SCIPY_SRC=/path/to/scipy tools/update_lock.sh
 #
-# Review the resulting diff before committing it. `uv.lock` covers all of scipy's
-# dependency groups, so most of the diff has no bearing on the wheels; the pins that do
-# get installed are printed at the end.
+# Review the resulting diff before committing it; the pins that get installed are printed
+# at the end.
 set -euo pipefail
 
 # Keep in sync with the --exclude-newer in the check_lock job in wheels.yml. uv records
@@ -57,17 +56,15 @@ if [[ ! -f "$SCIPY_SRC/pyproject.toml" ]]; then
     echo "       clone scipy/scipy there, or point \$SCIPY_SRC at an existing checkout" >&2
     exit 1
 fi
-SCIPY_SRC="$(cd "$SCIPY_SRC" && pwd)"
 
-# Start from the existing lock file, so that only what has to change, changes.
-cp "$REPO_DIR/uv.lock" "$SCIPY_SRC/uv.lock"
-
-cd "$SCIPY_SRC"
+cd "$REPO_DIR"
+# via `uv run` so this works on machines whose system python3 predates tomllib
+uv run --no-project --quiet python tools/sync_dependency_groups.py "$SCIPY_SRC" \
+    > pyproject.toml
 uv lock --exclude-newer "$EXCLUDE_NEWER" ${UPGRADE[@]+"${UPGRADE[@]}"}
 uv lock --check --exclude-newer "$EXCLUDE_NEWER"
-cp "$SCIPY_SRC/uv.lock" "$REPO_DIR/uv.lock"
 
 echo
-echo "Updated $REPO_DIR/uv.lock. Effective build and test pins:"
+echo "Updated pyproject.toml and uv.lock. Effective build and test pins:"
 uv export --frozen --no-hashes --no-emit-project --no-default-groups \
     --group build --group openblas32 --group test-core

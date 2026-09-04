@@ -8,23 +8,25 @@ have commit access.
 
 ## Updating the pinned dependencies
 
-Every build and test dependency is pinned, with hashes, in the `uv.lock` file at the root
-of this repository. That lock file is not generated from anything in *this* repository -
-it is generated from the `pyproject.toml` of the `scipy/scipy` commit that this branch
-builds (`SOURCE_REF_TO_BUILD` in `.github/workflows/wheels.yml`), and the build scripts
-install from it with `uv export --require-hashes`.
+Every build and test dependency is pinned, with hashes, in `uv.lock`. The dependency
+groups it pins live in `pyproject.toml`, which is *generated* - it is a copy of the
+`build`, `test-core` and `openblas32`/`openblas64` groups from the `pyproject.toml` of
+the `scipy/scipy` commit this branch builds (`SOURCE_REF_TO_BUILD` in
+`.github/workflows/wheels.yml`). The build scripts install from the lock file with
+`uv export --require-hashes`.
 
-Because of that coupling, the lock file goes stale whenever scipy's `pyproject.toml`
-changes - which includes its dependency groups, its `requires-python`, *and* its version
-string, since `uv.lock` records it. So a new lock file is needed at least on every
-version bump on `main` and for every release branch. The `check_lock` CI job runs
-`uv lock --check` before any wheels are built and fails with
-`The lockfile at uv.lock needs to be updated` when this happens.
+Locking scipy's own `pyproject.toml` would work too, but it would pin all of its
+dependency groups - `doc`, `dev`, `typecheck` and the rest - which is about 180 extra
+packages that are never installed here, and a lock file six times the size.
 
-To regenerate it:
+Because `pyproject.toml` is a copy, it goes stale whenever scipy changes those four
+groups. The `check_lock` CI job regenerates it, diffs it against the committed one, and
+then runs `uv lock --check`, before any wheels are built.
+
+To regenerate both files:
 
 ```bash
-tools/update_lock.sh              # sync the lock to scipy's pyproject.toml
+tools/update_lock.sh              # sync to scipy's dependency groups
 tools/update_lock.sh --upgrade    # ... and also bump every pin to the latest release
 ```
 
@@ -45,33 +47,19 @@ installed unpinned from `scipy-src/requirements/pkgconf.txt`. Closing that gap n
 
 ## Reviewing a lock file change
 
-`uv.lock` covers *all* of scipy's dependency groups, including `doc`, `dev` and
-`typecheck`, so most of any lock diff has no bearing on the artifacts this repository
-produces - and at ~4000 lines it is not something to read line by line. Review the
-~30 packages that actually get installed instead:
+Check `pyproject.toml` first: it determines everything else, and a change to it should
+correspond to a change in scipy's dependency groups. `check_lock` proves that it does.
 
-- The `check_lock` job writes exactly that list to its job summary on every run, so a PR
-  that touches `uv.lock` can be reviewed by comparing its summary against the one from the
-  most recent run on `main`. `tools/update_lock.sh` prints the same list locally.
-- To produce it yourself, from a scipy checkout with the candidate `uv.lock` copied in:
+For `uv.lock` itself, worth checking on top of the version changes:
 
-  ```bash
-  uv export --frozen --no-hashes --no-emit-project --no-default-groups \
-      --group build --group openblas32 --group test-core
-  ```
-
-Worth checking on top of the version changes themselves:
-
-- That the lock file still matches the scipy commit being built - `uv lock --check
-  --exclude-newer "7 days"` from that checkout, which is what `check_lock` runs. It fails
-  with `The lockfile at uv.lock needs to be updated`.
 - That the diff contains no `source = { registry = ... }` pointing anywhere other than
   `https://pypi.org/simple`, and no `source = { url = ... }` or `{ git = ... }` entries.
 - That `requires-python` and the `[options]` block at the top of the file are unchanged;
   a dropped `exclude-newer-span` means the cooldown was silently skipped.
-- That the number of packages hasn't grown unexpectedly. A dependency group gaining a
-  package is normal; the build and test environments gaining one is not, and shows up in
-  the list above.
+- That the number of packages hasn't grown unexpectedly. The `check_lock` job writes the
+  packages that get installed to its job summary on every run, so a PR touching the lock
+  file can be reviewed by comparing its summary against the one from the most recent run
+  on `main`. `tools/update_lock.sh` prints the same list locally.
 
 
 ## Running CI jobs on your own fork

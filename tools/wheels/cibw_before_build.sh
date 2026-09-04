@@ -42,11 +42,10 @@ fi
 # install build dependencies via uv
 # log which uv this is: on Linux it comes from the manylinux image, not from setup-uv
 uv --version
-# uv.lock file needs to be in the same location as pyproject.toml.
-# It is checked against scipy's pyproject.toml by the check_lock job in wheels.yml.
-cp uv.lock $SCIPY_SRC_DIR
+# the lock file lives in this repo, not in the scipy checkout; the check_lock job in
+# wheels.yml verifies it still matches scipy's dependency groups
 PYTHON_EXE="$(python -c 'import sys; print(sys.executable)')"
-uv export --project "$SCIPY_SRC_DIR" --no-default-groups --group build --no-emit-project $OPENBLAS_GRP --frozen | \
+uv export --project "$PROJECT_DIR" --no-default-groups --group build --no-emit-project $OPENBLAS_GRP --frozen | \
     uv pip install --python "$PYTHON_EXE" --no-deps --require-hashes -r -
 
 
