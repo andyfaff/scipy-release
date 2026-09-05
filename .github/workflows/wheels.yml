@@ -249,43 +249,48 @@ jobs:
           checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
           enable-cache: false
 
+      - name: Set up OpenBLAS
+        run: |
+          # Apart from generating the .pc file below, nothing imports from this
+          # environment: scipy only links against the shared library in it, and finds
+          # it again at runtime through the rpath that the .pc file bakes in. So it is
+          # kept separate, and has to outlive the build and test environments.
+          export UV_PROJECT_ENVIRONMENT=$GITHUB_WORKSPACE/.openblas-venv
+          uv sync --python-preference only-managed --frozen --no-default-groups --group $OPENBLAS
+
+          pkgconf_path=$GITHUB_WORKSPACE/.openblas
+          rm -rf $pkgconf_path
+          mkdir -p $pkgconf_path
+          $UV_PROJECT_ENVIRONMENT/bin/python -c "import scipy_${OPENBLAS}; print(scipy_${OPENBLAS}.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
+          echo "PKG_CONFIG_PATH=$pkgconf_path" >> "$GITHUB_ENV"
+
       - name: Build sdist
         run: |
           # use uv and a lock file to pin down all dependencies for the sdist build.
           # The lock file lives in this repo, so sync from here; the environment goes
           # into the scipy checkout, where `uv build --no-build-isolation` looks for it.
-          export UV_PROJECT_ENVIRONMENT=$GITHUB_WORKSPACE/scipy-src/.venv
-
-          # installs the 'build' and 'openblas32' dependency groups
           # --frozen : uses specification in uv.lock as source of truth
           # only-managed: force uv to use a managed python. No version is requested, so
           #     it's uv's default managed CPython - i.e. UV_VERSION decides which Python
           #     the sdist is built and tested with; cibuildwheel isn't used in this job.
-          uv sync --python-preference only-managed --frozen --no-default-groups --group build --group $OPENBLAS
+          export UV_PROJECT_ENVIRONMENT=$GITHUB_WORKSPACE/scipy-src/.venv
+          uv sync --python-preference only-managed --frozen --no-default-groups --group build
 
-          pushd scipy-src
-          # need openblas even for the sdist build
-          pkgconf_path=$GITHUB_WORKSPACE/scipy-src/.openblas
-
-          rm -rf $pkgconf_path
-          mkdir -p $pkgconf_path
-
-          # --no-project : don't want uv to install project first
-          uv run --no-reinstall --no-project --managed-python python -c "import scipy_${OPENBLAS}; print(scipy_${OPENBLAS}.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
-          export PKG_CONFIG_PATH=$pkgconf_path
-          echo "PKG_CONFIG_PATH=$pkgconf_path" >> "$GITHUB_ENV"
-
+          cd scipy-src
           uv build --sdist --no-build-isolation .
-          popd
 
       - name: Install the sdist
         run: |
+          # the sdist build environment has done its job; removing it proves that the
+          # test environment doesn't quietly depend on it
+          rm -rf $GITHUB_WORKSPACE/scipy-src/.venv
+
           cd scipy-src/dist
 
           # build and install the sdist in a fresh venv, populated by the same
           # `uv sync` from the same lock file as the build environment above
           export UV_PROJECT_ENVIRONMENT=$GITHUB_WORKSPACE/scipy-src/dist/test
-          uv sync --project $GITHUB_WORKSPACE --python-preference only-managed --frozen --no-default-groups --group build --group test-core --group $OPENBLAS
+          uv sync --project $GITHUB_WORKSPACE --python-preference only-managed --frozen --no-default-groups --group build --group test-core
           source test/bin/activate
           uv pip install --no-deps --no-build-isolation -v *.gz
 
