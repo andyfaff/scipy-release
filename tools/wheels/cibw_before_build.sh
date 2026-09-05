@@ -17,25 +17,13 @@ elif [[ $RUNNER_OS == "Windows" ]]; then
 fi
 
 
-# further checks to determine if openblas is to be installed
-if [[ $(python -c"import sys; print(sys.maxsize)") < $(python -c"import sys; print(2**33)") ]]; then
-    echo "No BLAS used for 32-bit wheels"
-    export INSTALL_OPENBLAS=false
-elif [ -z $INSTALL_OPENBLAS ]; then
-    # the macos_arm64 build might not set this variable
-    export INSTALL_OPENBLAS=true
-fi
-
-
-# By default, use scipy-openblas32
-# On 32-bit platforms and on win-arm64, use scipy-openblas32
-OPENBLAS=openblas32
-
-# do we install OpenBLAS as part of the build dependencies?
+# Every wheel links against scipy-openblas32, except the macOS ones built against
+# Accelerate - wheels.yml sets INSTALL_OPENBLAS=false for those, and leaves it unset
+# everywhere else. scipy-openblas64 is not used for wheels at all.
+INSTALL_OPENBLAS=${INSTALL_OPENBLAS:-true}
+OPENBLAS_GRP=""
 if [[ "$INSTALL_OPENBLAS" = "true" ]] ; then
-    OPENBLAS_GRP="--group ${OPENBLAS}"
-else
-    OPENBLAS_GRP=""
+    OPENBLAS_GRP="--group openblas32"
 fi
 
 
@@ -55,18 +43,17 @@ if [[ "$INSTALL_OPENBLAS" = "true" ]] ; then
     # cibuildwheel.toml and .github/workflows/wheels.yml. Note that
     # `pkgconf_path` here is only a bash variable local to this file.
     pkgconf_path=$PROJECT_DIR/.openblas
-    echo pkgconf_path is $pkgconf_path, OPENBLAS is ${OPENBLAS}
     rm -rf $pkgconf_path
     mkdir -p $pkgconf_path
-    python -c "import scipy_${OPENBLAS}; print(scipy_${OPENBLAS}.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
+    python -c "import scipy_openblas32; print(scipy_openblas32.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
 
     # Copy scipy-openblas DLL's to a fixed location so we can point delvewheel
     # at it in `repair_windows.sh` (needed only on Windows because of the lack
     # of RPATH support).
     if [[ $RUNNER_OS == "Windows" ]]; then
         python <<EOF
-import os, scipy_${OPENBLAS}, shutil
-srcdir = os.path.join(os.path.dirname(scipy_${OPENBLAS}.__file__), "lib")
+import os, scipy_openblas32, shutil
+srcdir = os.path.join(os.path.dirname(scipy_openblas32.__file__), "lib")
 shutil.copytree(srcdir, os.path.join("$pkgconf_path", "lib"))
 EOF
     fi
