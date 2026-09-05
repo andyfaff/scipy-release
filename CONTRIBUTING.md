@@ -32,13 +32,13 @@ tools/update_lock.sh --upgrade    # ... and also bump every pin to the latest re
 ```
 
 This expects a `scipy/scipy` checkout at `../scipy`, at the commit named by
-`SOURCE_REF_TO_BUILD`; set `$SCIPY_SRC` if yours lives somewhere else. It errors out if
-your `uv` is older than CI's.
+`SOURCE_REF_TO_BUILD`; set `$SCIPY_SRC` if yours lives somewhere else. Use a `uv` at
+least as new as CI's `UV_VERSION` - older ones write a different lock file format.
 
 Releases published within the last 7 days are ignored, so that a version published in the
 last few days can't end up in a build. uv writes that window into the lock file and
 `uv lock --check` only passes when given the *same* value, so it is hardcoded in two
-places that have to agree: the `check_lock` job in `wheels.yml`, and `EXCLUDE_NEWER` in
+places that have to agree: the `check_lock` job in `wheels.yml`, and
 `tools/update_lock.sh`. Change one and CI will reject the lock file you generate.
 
 One dependency is deliberately not in the lock file: `pkgconf` on Windows, which is still
@@ -60,7 +60,12 @@ For `uv.lock` itself, worth checking on top of the version changes:
 - That the number of packages hasn't grown unexpectedly. The `check_lock` job writes the
   packages that get installed to its job summary on every run, so a PR touching the lock
   file can be reviewed by comparing its summary against the one from the most recent run
-  on `main`. `tools/update_lock.sh` prints the same list locally.
+  on `main`. To produce that list locally:
+
+  ```bash
+  uv export --frozen --no-hashes --no-emit-project --no-default-groups \
+      --group build --group openblas32 --group test-core
+  ```
 
 
 ## Running CI jobs on your own fork
