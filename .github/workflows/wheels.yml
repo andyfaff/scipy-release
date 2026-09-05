@@ -187,7 +187,6 @@ jobs:
           CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}*
           CIBW_ARCHS: ${{ matrix.buildplat[2] }}
           CIBW_ENABLE: cpython-prerelease
-          CIBW_DEPENDENCY_VERSIONS: pinned
         with:
            package-dir: scipy-src
            output-dir: dist

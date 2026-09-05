@@ -1,6 +1,10 @@
 [tool.cibuildwheel]
 skip = ["*_i686", "*_ppc64le", "*_s390x", "*_universal2"]
 
+# pin the tools cibuildwheel itself uses (pip, build, delocate, delvewheel). This is
+# the default, but state it explicitly - everything else here is pinned deliberately.
+dependency-versions = "pinned"
+
 # we install all build dependencies ourselves in the cibw_before_build step
 build-frontend = { name = "build", args = ["--no-isolation"] }
 before-build = "bash {project}/tools/wheels/cibw_before_build.sh {project}"
