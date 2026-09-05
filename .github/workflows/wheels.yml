@@ -83,7 +83,7 @@ jobs:
             uv export --frozen --no-hashes --no-emit-project --no-default-groups \
               --group build --group openblas32 --group test-core
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
 
   build_wheels:
