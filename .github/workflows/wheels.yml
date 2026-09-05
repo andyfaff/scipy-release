@@ -64,6 +64,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           # unlike build_wheels, this job is Linux-only, so we can pin the download too
           checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
+          enable-cache: false
 
       - name: Check lock file
         run: |
@@ -142,6 +143,7 @@ jobs:
           # can't use checksum here, because there are different packages
           # for different OS
           version: ${{ env.UV_VERSION }}
+          enable-cache: false
 
       - name: Setup windows
         if: matrix.buildplat[1] == 'win'
@@ -246,6 +248,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
+          enable-cache: false
 
       - name: Build sdist
         run: |
