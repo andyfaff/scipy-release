@@ -14,6 +14,7 @@ That is what catches scipy changing its build or test requirements - the same jo
 string or editing groups we don't install.
 """
 import sys
+import json
 import tomllib
 
 # the groups the wheel and sdist builds install; see cibw_before_build.sh,
@@ -54,8 +55,10 @@ def main():
            "[tool.uv]", "# a virtual project: there is nothing here to build or install",
            "package = false", "", "[dependency-groups]"]
     for group in GROUPS:
+        # json.dumps to quote and escape. A marker like `sys_platform == "win32"`
+        # carries its own double quotes, and TOML basic strings escape them as JSON does
         requirements = ",\n    ".join(
-            f'"{r}"' for r in flatten(scipy["dependency-groups"], group)
+            json.dumps(r) for r in flatten(scipy["dependency-groups"], group)
         )
         out.append(f"{group} = [\n    {requirements},\n]")
 

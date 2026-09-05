@@ -445,6 +445,20 @@ wheels = [
 ]
 
 [[package]]
+name = "pkgconf"
+version = "2.5.1.post1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "os_name == 'nt'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f3/2c/db2a46e35c3f3f9cca7ec1de9ea222dd898aa0dd4a94993accbd687eb940/pkgconf-2.5.1.post1.tar.gz", hash = "sha256:a123243d18214906a23ee290917e6117dd7d92ee6660e66c80c956ee9afb70cb", size = 153921, upload-time = "2026-02-13T04:52:29.593Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/7b/57320181d5dcd97eb9ffc15b239c559095cd0846033662c4411f2b599316/pkgconf-2.5.1.post1-py3-none-win32.whl", hash = "sha256:1b036d4197dc677738cec1619a06947c47e4112b0394e5b2047fda2b51784e86", size = 52519, upload-time = "2026-02-13T04:52:26.061Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/78/d082a00a15903fd989c0a16de6bc3201acead59ad7fff9f19ca6144636cf/pkgconf-2.5.1.post1-py3-none-win_amd64.whl", hash = "sha256:288bcf988617c2549255f41c9e109ed13c196e38ec3d4f75702751858b13fc8c", size = 52519, upload-time = "2026-02-13T04:52:27.184Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/6f/5a8cc04671f38f60b7cc1f68cc5384afb3d879c00e71953e15adb0919a6c/pkgconf-2.5.1.post1-py3-none-win_arm64.whl", hash = "sha256:2f69e9c9d0049626e2534c09a45b216efad3f16bbefcaff4586371efa213f36f", size = 48350, upload-time = "2026-02-13T04:52:28.427Z" },
+]
+
+[[package]]
 name = "platformdirs"
 version = "4.11.5"
 source = { registry = "https://pypi.org/simple" }
@@ -640,9 +654,11 @@ build = [
     { name = "pythran" },
 ]
 openblas32 = [
+    { name = "pkgconf", marker = "sys_platform == 'win32'" },
     { name = "scipy-openblas32" },
 ]
 openblas64 = [
+    { name = "pkgconf", marker = "sys_platform == 'win32'" },
     { name = "scipy-openblas64" },
 ]
 test-core = [
@@ -664,8 +680,14 @@ build = [
     { name = "pybind11", specifier = ">=2.13.2" },
     { name = "pythran", specifier = ">=0.18.1" },
 ]
-openblas32 = [{ name = "scipy-openblas32", specifier = "==0.3.34.0.0" }]
-openblas64 = [{ name = "scipy-openblas64", specifier = "==0.3.34.0.0" }]
+openblas32 = [
+    { name = "pkgconf", marker = "sys_platform == 'win32'", specifier = "==2.5.1.post1" },
+    { name = "scipy-openblas32", specifier = "==0.3.34.0.0" },
+]
+openblas64 = [
+    { name = "pkgconf", marker = "sys_platform == 'win32'", specifier = "==2.5.1.post1" },
+    { name = "scipy-openblas64", specifier = "==0.3.34.0.0" },
+]
 test-core = [
     { name = "hypothesis", specifier = ">=6.30" },
     { name = "pooch" },
