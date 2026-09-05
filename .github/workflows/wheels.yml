@@ -278,16 +278,22 @@ jobs:
           uv build --sdist --no-build-isolation .
           popd
 
-      - name: Test the sdist
+      - name: Install the sdist
         run: |
-          pushd scipy-src/dist
+          cd scipy-src/dist
 
-          # build and install the sdist in a venv, populated by the same `uv sync`
-          # from the same lock file as the build environment above
+          # build and install the sdist in a fresh venv, populated by the same
+          # `uv sync` from the same lock file as the build environment above
           export UV_PROJECT_ENVIRONMENT=$GITHUB_WORKSPACE/scipy-src/dist/test
           uv sync --project $GITHUB_WORKSPACE --python-preference only-managed --frozen --no-default-groups --group build --group test-core --group $OPENBLAS
           source test/bin/activate
           uv pip install --no-deps --no-build-isolation -v *.gz
+
+      - name: Test the sdist
+        run: |
+          # each step gets a fresh shell, so re-enter the venv built above
+          cd scipy-src/dist
+          source test/bin/activate
           python -c "import scipy, sys; print(scipy.__version__); sys.exit(scipy.test() is False)"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
