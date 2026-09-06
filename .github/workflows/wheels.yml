@@ -5,6 +5,7 @@ env:
   # to build wheels. This is normally set to `main` in the main branch of this
   # repo, and to a tag name (e.g., `v2.3.2`) on a release branch.
   SOURCE_REF_TO_BUILD: main
+  UV_VERSION: "0.12.5"
 
 on:
   schedule:
@@ -38,10 +39,59 @@ permissions:
   contents: read # to fetch code (actions/checkout)
 
 jobs:
+  check_lock:
+    name: Check uv.lock file
+    runs-on: ubuntu-latest
+    if: (github.repository == 'scipy/scipy-release' || github.repository == '')
+
+    steps:
+      - name: Checkout scipy-release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout scipy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: scipy/scipy
+          ref: ${{ env.SOURCE_REF_TO_BUILD }}
+          path: scipy-src
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          # unlike build_wheels, this job is Linux-only, so we can pin the download too
+          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
+          enable-cache: false
+
+      - name: Check lock file
+        run: |
+          # pyproject.toml holds the dependency groups the builds install, copied out
+          # of scipy's; regenerating it here is what catches scipy changing them.
+          # See CONTRIBUTING.md for how to regenerate these files. The cooldown the
+          # lock was generated with is recorded in it, and has to be repeated here.
+          python3 tools/sync_dependency_groups.py scipy-src | diff -u pyproject.toml -
+          uv lock --check --exclude-newer "7 days"
+
+      - name: Record the pins that will be used
+        run: |
+          # the packages that actually get installed, for review of a lock file bump
+          {
+            echo '## Build and test dependencies for this run'
+            echo '```'
+            uv export --frozen --no-hashes --no-emit-project --no-default-groups \
+              --group build --group openblas32 --group test-core
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+
   build_wheels:
     name: BLD > ${{ matrix.python }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}-${{ matrix.buildplat[3] }}
     runs-on: ${{ matrix.buildplat[0] }}
     if: (github.repository == 'scipy/scipy-release' || github.repository == '')
+    needs: [check_lock]
     strategy:
       # Ensure that a wheel builder finishes even if another fails
       fail-fast: false
@@ -84,10 +134,20 @@ jobs:
         with:
           python-version: 3.13
 
+      # Used in cibw_before_build to install pinned build dependencies
+      # Note that cibuildwheel provides it in the Linux images, so this install
+      # is only useful on macOS/windows
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          # can't use checksum here, because there are different packages
+          # for different OS
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+
       - name: Setup windows
         if: matrix.buildplat[1] == 'win'
         run: |
-          echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
           echo "CC=clang-cl" >> $env:GITHUB_ENV
           echo "CXX=clang-cl" >> $env:GITHUB_ENV
           echo "TARGET_ARCH=${{ matrix.buildplat[2] }}" >> $env:GITHUB_ENV
@@ -151,66 +211,100 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Install micromamba
-        uses: mamba-org/setup-micromamba@ce51e99f4bb8a82ab7158c4dc59ef4634c59c4f9 # v3.1.0
+      - name: Upload nightly wheel
+        uses: scientific-python/upload-nightly-action@e76cfec8a4611fd02808a801b0ff5a7d7c1b2d99 # 0.6.4
         with:
-          # For installation of anaconda-client, required for upload to anaconda.org
-          init-shell: bash
-          environment-name: upload-env
-          create-args: >-
-            anaconda-client
-
-      - name: Upload to anaconda.org
-        shell: bash -el {0}  # required for micromamba
-        env:
-          TOKEN: ${{ secrets.SCIPY_NIGHTLY_UPLOAD_TOKEN }}
-        run: |
-          anaconda -q -t ${TOKEN} upload --force -u scientific-python-nightly-wheels ./dist/*.whl
+          anaconda_nightly_upload_token: ${{ secrets.SCIPY_NIGHTLY_UPLOAD_TOKEN }}
+          artifacts_path: dist/
 
 # -------------------------------------------------------------------------------------
   build_sdist:
     name: Build sdist
     runs-on: ubuntu-latest
     if: github.repository == 'scipy/scipy-release'
+    # this job installs with `--frozen`, which skips the lock file check
+    needs: [check_lock]
+    env:
+      OPENBLAS: openblas32
 
     steps:
+      - name: Checkout scipy-release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: scipy/scipy
-          submodules: true
           ref: ${{ env.SOURCE_REF_TO_BUILD }}
+          path: scipy-src
+          submodules: true
           persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
+          enable-cache: false
+
+      - name: Set up OpenBLAS
+        run: |
+          # Apart from generating the .pc file below, nothing imports from this
+          # environment: scipy only links against the shared library in it, and finds
+          # it again at runtime through the rpath that the .pc file bakes in. So it is
+          # kept separate, and has to outlive the build and test environments.
+          export UV_PROJECT_ENVIRONMENT=$GITHUB_WORKSPACE/.openblas-venv
+          uv sync --python-preference only-managed --frozen --no-default-groups --group $OPENBLAS
+
+          pkgconf_path=$GITHUB_WORKSPACE/.openblas
+          rm -rf $pkgconf_path
+          mkdir -p $pkgconf_path
+          $UV_PROJECT_ENVIRONMENT/bin/python -c "import scipy_${OPENBLAS}; print(scipy_${OPENBLAS}.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
+          echo "PKG_CONFIG_PATH=$pkgconf_path" >> "$GITHUB_ENV"
 
       - name: Build sdist
         run: |
-          python -m pip install -U pip build
+          # use uv and a lock file to pin down all dependencies for the sdist build.
+          # The lock file lives in this repo, so sync from here; the environment goes
+          # into the scipy checkout, where `uv build --no-build-isolation` looks for it.
+          # --frozen : uses specification in uv.lock as source of truth
+          # only-managed: force uv to use a managed python. No version is requested, so
+          #     it's uv's default managed CPython - i.e. UV_VERSION decides which Python
+          #     the sdist is built and tested with; cibuildwheel isn't used in this job.
+          export UV_PROJECT_ENVIRONMENT=$GITHUB_WORKSPACE/scipy-src/.venv
+          uv sync --python-preference only-managed --frozen --no-default-groups --group build
 
-          # need openblas even for the sdist build
-          OPENBLAS=openblas32
-          pkgconf_path=$GITHUB_WORKSPACE/.openblas
+          cd scipy-src
+          uv build --sdist --no-build-isolation .
 
-          rm -rf $pkgconf_path
-          mkdir -p $pkgconf_path
+      - name: Install the sdist
+        run: |
+          # the sdist build environment has done its job; removing it proves that the
+          # test environment doesn't quietly depend on it
+          rm -rf $GITHUB_WORKSPACE/scipy-src/.venv
 
-          python -m pip install --group $OPENBLAS
-          python -c "import scipy_${OPENBLAS}; print(scipy_${OPENBLAS}.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
-          export PKG_CONFIG_PATH=$pkgconf_path
-          echo "PKG_CONFIG_PATH=$pkgconf_path" >> "$GITHUB_ENV"
+          cd scipy-src/dist
 
-          python -m build --sdist
+          # build and install the sdist in a fresh venv, populated by the same
+          # `uv sync` from the same lock file as the build environment above
+          export UV_PROJECT_ENVIRONMENT=$GITHUB_WORKSPACE/scipy-src/dist/test
+          uv sync --project $GITHUB_WORKSPACE --python-preference only-managed --frozen --no-default-groups --group build --group test-core
+          source test/bin/activate
+          uv pip install --no-deps --no-build-isolation -v *.gz
 
       - name: Test the sdist
         run: |
-          python -m pip install -v dist/*.gz
-          pip install pytest hypothesis pooch
-          cd .. # Can't import scipy within scipy src directory
+          # each step gets a fresh shell, so re-enter the venv built above
+          cd scipy-src/dist
+          source test/bin/activate
           python -c "import scipy, sys; print(scipy.__version__); sys.exit(scipy.test() is False)"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sdist
-          path: ./dist/*
+          path: scipy-src/dist/*.tar.gz
 
 # -------------------------------------------------------------------------------------
   testpypi-publish:
