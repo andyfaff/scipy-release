@@ -41,11 +41,6 @@ last few days can't end up in a build. uv writes that window into the lock file 
 places that have to agree: the `check_lock` job in `wheels.yml`, and
 `tools/update_lock.sh`. Change one and CI will reject the lock file you generate.
 
-One dependency is deliberately not in the lock file: `pkgconf` on Windows, which is still
-installed unpinned from `scipy-src/requirements/pkgconf.txt`. Closing that gap needs a
-`pkgconf` dependency group in scipy's `pyproject.toml`.
-
-
 ## Reviewing a lock file change
 
 Check `pyproject.toml` first: it determines everything else, and a change to it should
