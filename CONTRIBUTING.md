@@ -10,7 +10,7 @@ have commit access.
 
 Every build and test dependency is pinned, with hashes, in `uv.lock`. The dependency
 groups it pins live in the committed `pyproject.toml`, which is *generated* from the
-`build`, `test-core` and `openblas32`/`openblas64` groups from the `pyproject.toml` of
+`build`, `test-core` and `openblas32` groups from the `pyproject.toml` of
 `scipy/scipy`. It needs to be consistent with the `scipy/scipy` commit this
 branch builds (`SOURCE_REF_TO_BUILD` in`.github/workflows/wheels.yml`). The build
 scripts install from the lock file with `uv export --require-hashes`.
@@ -19,7 +19,7 @@ Locking scipy's own `pyproject.toml` would work too, but it would pin all of its
 dependency groups - `doc`, `dev`, `typecheck` and the rest - which is about 180 extra
 packages that are never installed here, and a lock file six times the size.
 
-Because `pyproject.toml` is a copy, it goes stale whenever scipy changes those four
+Because `pyproject.toml` is a copy, it goes stale whenever scipy changes those three
 groups. The `check_lock` CI job uses `tools/sync_dependency_groups.py` to
 generate a `pyproject.toml` from `scipy/scipy`, diffs it against the committed one (in
 this repository), and then runs `uv lock --check`, before any wheels are built.

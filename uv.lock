@@ -622,24 +622,6 @@ wheels = [
 ]
 
 [[package]]
-name = "scipy-openblas64"
-version = "0.3.34.0.0"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/aa/858abe56c88751d5585aa518f09787566d08ab28e2a8212f6d239128dde0/scipy_openblas64-0.3.34.0.0-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:a78b41c5bb781c44cb23ebed48d72c35f8e37670c785fe1febeaf3746990e21d", size = 10296836, upload-time = "2026-07-19T20:14:05.266Z" },
-    { url = "https://files.pythonhosted.org/packages/bd/ae/f7e5cfb6e1d7e08bab2c6091cc151894c20d1ea048510ef866183c5410be/scipy_openblas64-0.3.34.0.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:0c1109a05550b3a231f34fcebabd56e3929b379e75a90fa746bda82873e1442a", size = 6700742, upload-time = "2026-07-19T20:14:07.733Z" },
-    { url = "https://files.pythonhosted.org/packages/02/a7/4d9a4b2aad199b8dd2c044435db709e4ec4c5be839af2c8d1b4181cc052c/scipy_openblas64-0.3.34.0.0-py3-none-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c3468971a0e757a0bfeeffa4cbd99dfe1f0c4882909673f5039b79cb5bf2996a", size = 9155489, upload-time = "2026-07-19T20:14:09.568Z" },
-    { url = "https://files.pythonhosted.org/packages/00/ed/7867c91c58364c971d24fc811f313cd1ad23cf9670c91e1ccb197ae916a9/scipy_openblas64-0.3.34.0.0-py3-none-manylinux_2_27_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:e5442fc01374a216b2228560ae22ba334f5d6ed8a626a084e97330b3d3512e92", size = 8957171, upload-time = "2026-07-19T20:14:11.966Z" },
-    { url = "https://files.pythonhosted.org/packages/a3/cb/5fbf270f768b929ae0cfcbd68ed8529cddaef041d7115a4c411dc33176c6/scipy_openblas64-0.3.34.0.0-py3-none-manylinux_2_27_s390x.manylinux_2_28_s390x.whl", hash = "sha256:bbe342939bf2645673c855a58fd838ac9c831126387428aa79054cce2cbb235b", size = 6690938, upload-time = "2026-07-19T20:14:14.211Z" },
-    { url = "https://files.pythonhosted.org/packages/97/49/1c059e7ddc6c74c5309ddc62dec6505112bdfaf16f6bfda13414ca83b32b/scipy_openblas64-0.3.34.0.0-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:181eaaae08cd7d274bfd2b68f569792b369adf40ff5e8ebcc89c4ddbc348bfb2", size = 8700822, upload-time = "2026-07-19T20:14:16.08Z" },
-    { url = "https://files.pythonhosted.org/packages/c2/36/ca8c158bf1f19d7c5c4488bd26025ede7ce21cdfb4b59a43c01f70f911cc/scipy_openblas64-0.3.34.0.0-py3-none-manylinux_2_38_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:c52fa2a5a9a46610d5a7a1b5dc68887dc0eb5631805efb9e60d8c4abe4ce5f61", size = 5917321, upload-time = "2026-07-19T20:14:18.025Z" },
-    { url = "https://files.pythonhosted.org/packages/c3/3a/db6b355ca4816a503819468fd5b7ee8f13b3d7f6e97ea13ace9a760c238e/scipy_openblas64-0.3.34.0.0-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:0341e48ca657d9b5f9bd7f3ef7e576b905c3eb86975e3b5c77dbe2b39aed96ee", size = 9441781, upload-time = "2026-07-19T20:14:20.045Z" },
-    { url = "https://files.pythonhosted.org/packages/70/4a/f36f8b9a9f201896909cba7d6fd9fd8b8adfc6bdba2697ea6c9f5cca5cb7/scipy_openblas64-0.3.34.0.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:265de5d6dc538cf8d2d9a899d9ac0c608b281bf3c572e90e7f549176ab8f38da", size = 9313641, upload-time = "2026-07-19T20:14:22.375Z" },
-    { url = "https://files.pythonhosted.org/packages/43/08/de15098b9cb74f831b50d34ef92137cb08f3d41e73a33048f30739d78ddb/scipy_openblas64-0.3.34.0.0-py3-none-win_amd64.whl", hash = "sha256:1789cc9db88ccb0aeb41e370ecce600814a7e6f887e089c0ac43504cd899db00", size = 6988651, upload-time = "2026-07-19T20:14:24.339Z" },
-    { url = "https://files.pythonhosted.org/packages/15/50/57669d5a1a30f7cd2aae1fb785aacdb94b3ea1ab9397db015754e9f438e2/scipy_openblas64-0.3.34.0.0-py3-none-win_arm64.whl", hash = "sha256:627451cf9f9e1bbfd684db1c079050189c6649762152f0bf03440afee962926a", size = 4975573, upload-time = "2026-07-19T20:14:26.231Z" },
-]
-
-[[package]]
 name = "scipy-release-deps"
 version = "0"
 source = { virtual = "." }
@@ -656,10 +638,6 @@ build = [
 openblas32 = [
     { name = "pkgconf", marker = "sys_platform == 'win32'" },
     { name = "scipy-openblas32" },
-]
-openblas64 = [
-    { name = "pkgconf", marker = "sys_platform == 'win32'" },
-    { name = "scipy-openblas64" },
 ]
 test-core = [
     { name = "hypothesis" },
@@ -683,10 +661,6 @@ build = [
 openblas32 = [
     { name = "pkgconf", marker = "sys_platform == 'win32'", specifier = "==2.5.1.post1" },
     { name = "scipy-openblas32", specifier = "==0.3.34.0.0" },
-]
-openblas64 = [
-    { name = "pkgconf", marker = "sys_platform == 'win32'", specifier = "==2.5.1.post1" },
-    { name = "scipy-openblas64", specifier = "==0.3.34.0.0" },
 ]
 test-core = [
     { name = "hypothesis", specifier = ">=6.30" },
