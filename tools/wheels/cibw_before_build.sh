@@ -47,12 +47,3 @@ if [[ "$INSTALL_OPENBLAS" = "true" ]] ; then
     mkdir -p $pkgconf_path
     python -c "import scipy_openblas32; print(scipy_openblas32.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
 fi
-
-
-if [[ $RUNNER_OS == "Windows" ]]; then
-    # TODO: include this requirement in a dependency group? At the moment
-    # it's the only unpinned package.
-    # pkgconf - carries out the role of pkg-config.
-    # Alternative is pkgconfiglite that you have to install with choco
-    python -m pip install -r $PROJECT_DIR/scipy-src/requirements/pkgconf.txt
-fi
