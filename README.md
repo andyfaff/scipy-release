@@ -22,8 +22,8 @@ See [numpy#29178](https://github.com/numpy/numpy/issues/29178) for more context.
 
 The `main` branch of this repository is meant to stay in sync with the `main` branch
 of the [scipy/scipy](https://github.com/scipy/scipy) repository. It runs scheduled builds
-as cron jobs twice a week, and uploads nightlies to 
-[https://anaconda.org/scientific-python-nightly-wheels/scipy](anaconda.org/scientific-python-nightly-wheels/scipy).
+as cron jobs twice a week, and uploads nightlies to
+[anaconda.org/scientific-python-nightly-wheels/scipy](https://anaconda.org/scientific-python-nightly-wheels/scipy).
 
 For SciPy releases, the branch naming should match those of the main
 `scipy/scipy` repository, e.g., `maintenance/1.17.x` for the 1.17.x releases.
@@ -37,9 +37,18 @@ controlled by the `SOURCE_REF_TO_BUILD` variable at the top of
 
 Wheel builds being fully reproducible is a long-term goal for this repository.
 All dependencies and actions must be pinned, which allows us to already be
-close to full reproducibility. However, we don't (yet) have full control over
-all ingredients that go into a wheel build, e.g. the containers which GitHub
-Actions provide may change over time.
+close to full reproducibility. Build and test dependencies are pinned, with
+hashes, in `uv.lock`. That file is generated from the dependency groups of the
+`scipy` commit being built, and CI checks that it is still in sync with
+them before any wheels are built - see `CONTRIBUTING.md` for how to regenerate
+it.
+
+Linux wheels are the closest to reproducible, because the build containers are
+pinned as well, by `cibuildwheel`. What we still need to do is actually verify
+build reproducibility in a systematic way.
+
+Windows and macOS wheels aren't reproducible yet, because the runner images
+that GitHub Actions provides aren't pinned and may change over time.
 
 
 ## Trusted publishing and attestations
