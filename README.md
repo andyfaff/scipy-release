@@ -22,8 +22,8 @@ See [numpy#29178](https://github.com/numpy/numpy/issues/29178) for more context.
 
 The `main` branch of this repository is meant to stay in sync with the `main` branch
 of the [scipy/scipy](https://github.com/scipy/scipy) repository. It runs scheduled builds
-as cron jobs twice a week, and uploads nightlies to 
-[https://anaconda.org/scientific-python-nightly-wheels/scipy](anaconda.org/scientific-python-nightly-wheels/scipy).
+as cron jobs twice a week, and uploads nightlies to
+[anaconda.org/scientific-python-nightly-wheels/scipy](https://anaconda.org/scientific-python-nightly-wheels/scipy).
 
 For SciPy releases, the branch naming should match those of the main
 `scipy/scipy` repository, e.g., `maintenance/1.17.x` for the 1.17.x releases.
