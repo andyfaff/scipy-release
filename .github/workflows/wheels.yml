@@ -246,6 +246,14 @@ jobs:
           CIBW_BUILD: cp315t-manylinux*
           CIBW_ARCHS: x86_64
           CIBW_ENABLE: cpython-prerelease
+          # Build dependencies normally live in cibuildwheel's /opt/python prefix.
+          # Deliberately use another prefix here so the comparison also detects
+          # build-environment paths leaking into the wheel.
+          CIBW_ENVIRONMENT_LINUX: >-
+            RUNNER_OS=Linux
+            PKG_CONFIG_PATH=/project/.openblas
+            SCIPY_BUILD_VENV=/tmp/scipy-reproducibility-build-venv
+            PATH=/tmp/scipy-reproducibility-build-venv/bin:$PATH
         with:
           package-dir: scipy-src
           output-dir: rebuilt

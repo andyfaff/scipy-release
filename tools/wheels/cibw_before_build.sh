@@ -33,6 +33,13 @@ uv --version
 # the lock file lives in this repo, not in the scipy checkout; the check_lock job in
 # wheels.yml verifies it still matches scipy's dependency groups
 PYTHON_EXE="$(python -c 'import sys; print(sys.executable)')"
+# The reproducibility job sets this to exercise a different build-dependency prefix.
+if [[ -n "${SCIPY_BUILD_VENV:-}" ]]; then
+    # Inherit cibuildwheel's pinned `build` frontend from its Python installation;
+    # the locked build dependencies installed below remain local to this environment.
+    uv venv --system-site-packages --python "$PYTHON_EXE" "$SCIPY_BUILD_VENV"
+    PYTHON_EXE="$SCIPY_BUILD_VENV/bin/python"
+fi
 uv export --project "$PROJECT_DIR" --no-default-groups --group build --no-emit-project $OPENBLAS_GRP --frozen | \
     uv pip install --python "$PYTHON_EXE" --no-deps --require-hashes -r -
 
@@ -45,5 +52,5 @@ if [[ "$INSTALL_OPENBLAS" = "true" ]] ; then
     pkgconf_path=$PROJECT_DIR/.openblas
     rm -rf $pkgconf_path
     mkdir -p $pkgconf_path
-    python -c "import scipy_openblas32; print(scipy_openblas32.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
+    "$PYTHON_EXE" -c "import scipy_openblas32; print(scipy_openblas32.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
 fi
