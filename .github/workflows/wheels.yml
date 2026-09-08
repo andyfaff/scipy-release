@@ -45,6 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       scipy_sha: ${{ steps.scipy_ref.outputs.sha }}
+      source_date_epoch: ${{ steps.scipy_ref.outputs.source_date_epoch }}
 
     steps:
       - name: Checkout scipy-release
@@ -62,7 +63,9 @@ jobs:
 
       - name: Resolve scipy source ref
         id: scipy_ref
-        run: echo "sha=$(git -C scipy-src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "sha=$(git -C scipy-src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "source_date_epoch=$(git -C scipy-src log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
 
       - name: Install uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -97,6 +100,10 @@ jobs:
     name: BLD > ${{ matrix.python }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}-${{ matrix.buildplat[3] }}
     runs-on: ${{ matrix.buildplat[0] }}
     needs: [check_lock]
+    env:
+      # Use the source commit time for timestamps in build artifacts. cibuildwheel
+      # automatically passes this variable into its Linux build containers.
+      SOURCE_DATE_EPOCH: ${{ needs.check_lock.outputs.source_date_epoch }}
     strategy:
       # Ensure that a wheel builder finishes even if another fails
       fail-fast: false
@@ -198,6 +205,8 @@ jobs:
     name: Check cp315t manylinux x86_64 reproducibility
     runs-on: ubuntu-22.04
     needs: [check_lock, build_wheels]
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.check_lock.outputs.source_date_epoch }}
 
     steps:
       - name: Checkout scipy-release
@@ -323,6 +332,7 @@ jobs:
     needs: [check_lock]
     env:
       OPENBLAS: openblas32
+      SOURCE_DATE_EPOCH: ${{ needs.check_lock.outputs.source_date_epoch }}
 
     steps:
       - name: Checkout scipy-release
