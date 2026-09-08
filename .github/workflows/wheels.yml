@@ -6,6 +6,8 @@ env:
   # repo, and to a tag name (e.g., `v2.3.2`) on a release branch.
   SOURCE_REF_TO_BUILD: main
   UV_VERSION: "0.12.5"
+  # Pinned commit from the temporary rgommers/cython build-repro integration branch.
+  CYTHON_REPRO_SHA: 9accdb81c41db619d1b29c324f594d66b22daeef
 
 on:
   schedule:
@@ -132,6 +134,14 @@ jobs:
           submodules: true
           persist-credentials: false
 
+      - name: Checkout patched Cython
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rgommers/cython
+          ref: ${{ env.CYTHON_REPRO_SHA }}
+          path: cython-src
+          persist-credentials: false
+
       # the version of python we'll run cibuildwheel with
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -190,6 +200,10 @@ jobs:
           CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}*
           CIBW_ARCHS: ${{ matrix.buildplat[2] }}
           CIBW_ENABLE: cpython-prerelease
+          CIBW_ENVIRONMENT_LINUX: >-
+            RUNNER_OS=Linux
+            PKG_CONFIG_PATH=/project/.openblas
+            SCIPY_CYTHON_SOURCE=/project/cython-src
         with:
            package-dir: scipy-src
            output-dir: dist
@@ -223,6 +237,14 @@ jobs:
           submodules: true
           persist-credentials: false
 
+      - name: Checkout patched Cython
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rgommers/cython
+          ref: ${{ env.CYTHON_REPRO_SHA }}
+          path: cython-src
+          persist-credentials: false
+
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: 3.13
@@ -253,6 +275,7 @@ jobs:
             RUNNER_OS=Linux
             PKG_CONFIG_PATH=/project/.openblas
             SCIPY_BUILD_VENV=/tmp/scipy-reproducibility-build-venv
+            SCIPY_CYTHON_SOURCE=/project/cython-src
             PATH=/tmp/scipy-reproducibility-build-venv/bin:$PATH
         with:
           package-dir: scipy-src

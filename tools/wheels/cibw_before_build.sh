@@ -43,6 +43,15 @@ fi
 uv export --project "$PROJECT_DIR" --no-default-groups --group build --no-emit-project $OPENBLAS_GRP --frozen | \
     uv pip install --python "$PYTHON_EXE" --no-deps --require-hashes -r -
 
+# Temporarily test reproducibility fixes from a Cython source checkout. The pinned
+# Cython wheel above is installed first so the rest of the locked environment stays
+# unchanged; only Cython itself is replaced here.
+if [[ -n "${SCIPY_CYTHON_SOURCE:-}" ]]; then
+    uv pip install --python "$PYTHON_EXE" --reinstall --no-deps --no-build-isolation \
+        "$SCIPY_CYTHON_SOURCE"
+    "$PYTHON_EXE" -c "import Cython; print(f'Using Cython {Cython.__version__} from {Cython.__file__}')"
+fi
+
 
 # Configure the pkg-config file for OpenBLAS
 if [[ "$INSTALL_OPENBLAS" = "true" ]] ; then
