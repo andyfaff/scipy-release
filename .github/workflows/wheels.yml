@@ -200,6 +200,13 @@ jobs:
           CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}*
           CIBW_ARCHS: ${{ matrix.buildplat[2] }}
           CIBW_ENABLE: cpython-prerelease
+          CIBW_CONFIG_SETTINGS_LINUX: "build-dir={package}/build-reference"
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: >-
+            bash {project}/tools/wheels/repair_linux.sh {wheel} {dest_dir} {project} &&
+            mkdir -p /output/cyutility-reference &&
+            cp {package}/build-reference/scipy/_cyutility.c /output/cyutility-reference/ &&
+            cp {package}/build-reference/scipy/_cyutility*.so.p/*_cyutility.c.o /output/cyutility-reference/_cyutility.o &&
+            cp {package}/build-reference/scipy/_cyutility*.so /output/cyutility-reference/_cyutility.so
           CIBW_ENVIRONMENT_LINUX: >-
             RUNNER_OS=Linux
             PKG_CONFIG_PATH=/project/.openblas
@@ -214,6 +221,15 @@ jobs:
         with:
           path: ./dist/*.whl
           name: ${{ matrix.python }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}-${{ matrix.buildplat[3] }}-${{ matrix.buildplat[4] }}
+
+      - name: Collect _cyutility reference intermediates
+        run: mv dist/cyutility-reference .
+
+      - name: Save _cyutility reference intermediates
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: cyutility-reference
+          key: cyutility-reference-${{ github.run_id }}-${{ github.run_attempt }}
 
 # -------------------------------------------------------------------------------------
   check_reproducibility:
@@ -263,12 +279,26 @@ jobs:
           name: cp315t-manylinux-x86_64--
           path: reference
 
+      - name: Restore _cyutility reference intermediates
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: cyutility-reference
+          key: cyutility-reference-${{ github.run_id }}-${{ github.run_attempt }}
+          fail-on-cache-miss: true
+
       - name: Rebuild wheel
         uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074 # v4.2.0
         env:
           CIBW_BUILD: cp315t-manylinux*
           CIBW_ARCHS: x86_64
           CIBW_ENABLE: cpython-prerelease
+          CIBW_CONFIG_SETTINGS_LINUX: "build-dir={package}/build-rebuilt"
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: >-
+            bash {project}/tools/wheels/repair_linux.sh {wheel} {dest_dir} {project} &&
+            mkdir -p /output/cyutility-rebuilt &&
+            cp {package}/build-rebuilt/scipy/_cyutility.c /output/cyutility-rebuilt/ &&
+            cp {package}/build-rebuilt/scipy/_cyutility*.so.p/*_cyutility.c.o /output/cyutility-rebuilt/_cyutility.o &&
+            cp {package}/build-rebuilt/scipy/_cyutility*.so /output/cyutility-rebuilt/_cyutility.so
           # Build dependencies normally live in cibuildwheel's /opt/python prefix.
           # Deliberately use another prefix here so the comparison also detects
           # build-environment paths leaking into the wheel.
@@ -283,6 +313,20 @@ jobs:
           package-dir: scipy-src
           output-dir: rebuilt
           config-file: cibuildwheel.toml
+
+      - name: Compare _cyutility intermediates
+        run: |
+          mv rebuilt/cyutility-rebuilt .
+
+          for artifact in _cyutility.c _cyutility.o _cyutility.so; do
+            if cmp -s "cyutility-reference/$artifact" "cyutility-rebuilt/$artifact"; then
+              result=identical
+            else
+              result=different
+            fi
+            echo "$artifact: $result"
+            sha256sum "cyutility-reference/$artifact" "cyutility-rebuilt/$artifact"
+          done | tee cyutility-comparison.txt
 
       - name: Install diffoscope
         run: |
@@ -332,7 +376,11 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: reproducibility-report-cp315t-manylinux-x86_64
-          path: diffoscope.*
+          path: |
+            diffoscope.*
+            cyutility-comparison.txt
+            cyutility-reference
+            cyutility-rebuilt
           if-no-files-found: ignore
           retention-days: 14
 
