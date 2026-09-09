@@ -181,12 +181,13 @@ jobs:
           fi
           echo "$CIBW_ENV" >> "$GITHUB_ENV"
 
-      - name: SOURCE_DATE_EPOCH
+      - name: Variables for reproducible builds
         run: |
           # https://cibuildwheel.pypa.io/en/v2.16.2/options/#environment-pass
           # cibuildwheel automatically passes the SOURCE_DATE_EPOCH if defined
           pushd scipy-src
           echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
+          echo "PYTHONHASHSEED=42" >> $GITHUB_ENV
 
       - name: Build wheels
         uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074 # v4.2.0
