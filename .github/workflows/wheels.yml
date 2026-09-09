@@ -203,6 +203,7 @@ jobs:
           CIBW_ENVIRONMENT_LINUX: >-
             RUNNER_OS=Linux
             PKG_CONFIG_PATH=/project/.openblas
+            LIBRARY_PATH=/project/.openblas/lib
             SCIPY_CYTHON_SOURCE=/project/cython-src
         with:
            package-dir: scipy-src
@@ -274,6 +275,7 @@ jobs:
           CIBW_ENVIRONMENT_LINUX: >-
             RUNNER_OS=Linux
             PKG_CONFIG_PATH=/project/.openblas
+            LIBRARY_PATH=/project/.openblas/lib
             SCIPY_BUILD_VENV=/tmp/scipy-reproducibility-build-venv
             SCIPY_CYTHON_SOURCE=/project/cython-src
             PATH=/tmp/scipy-reproducibility-build-venv/bin:$PATH
