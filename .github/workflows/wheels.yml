@@ -292,13 +292,14 @@ jobs:
           CIBW_BUILD: cp315t-manylinux*
           CIBW_ARCHS: x86_64
           CIBW_ENABLE: cpython-prerelease
-          CIBW_CONFIG_SETTINGS_LINUX: "build-dir={package}/build-rebuilt"
+          # Vary directory depth to expose relative source paths embedded by __FILE__.
+          CIBW_CONFIG_SETTINGS_LINUX: "build-dir={package}/build-rebuilt/nested/builddir"
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >-
             bash {project}/tools/wheels/repair_linux.sh {wheel} {dest_dir} {project} &&
             mkdir -p /output/cyutility-rebuilt &&
-            cp {package}/build-rebuilt/scipy/_cyutility.c /output/cyutility-rebuilt/ &&
-            cp {package}/build-rebuilt/scipy/_cyutility*.so.p/*_cyutility.c.o /output/cyutility-rebuilt/_cyutility.o &&
-            cp {package}/build-rebuilt/scipy/_cyutility*.so /output/cyutility-rebuilt/_cyutility.so
+            cp {package}/build-rebuilt/nested/builddir/scipy/_cyutility.c /output/cyutility-rebuilt/ &&
+            cp {package}/build-rebuilt/nested/builddir/scipy/_cyutility*.so.p/*_cyutility.c.o /output/cyutility-rebuilt/_cyutility.o &&
+            cp {package}/build-rebuilt/nested/builddir/scipy/_cyutility*.so /output/cyutility-rebuilt/_cyutility.so
           # Build dependencies normally live in cibuildwheel's /opt/python prefix.
           # Deliberately use another prefix here so the comparison also detects
           # build-environment paths leaking into the wheel.
