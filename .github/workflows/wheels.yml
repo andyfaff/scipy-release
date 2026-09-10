@@ -207,11 +207,15 @@ jobs:
             cp {package}/build-reference/scipy/_cyutility.c /output/cyutility-reference/ &&
             cp {package}/build-reference/scipy/_cyutility*.so.p/*_cyutility.c.o /output/cyutility-reference/_cyutility.o &&
             cp {package}/build-reference/scipy/_cyutility*.so /output/cyutility-reference/_cyutility.so
+          # Canonicalize relative __FILE__ paths before mapping source and build
+          # roots. The last (more specific) mapping takes precedence in GCC.
           CIBW_ENVIRONMENT_LINUX: >-
             RUNNER_OS=Linux
             PKG_CONFIG_PATH=/project/.openblas
             LIBRARY_PATH=/project/.openblas/lib
             SCIPY_CYTHON_SOURCE=/project/cython-src
+            CFLAGS="$CFLAGS -fcanon-prefix-map -fmacro-prefix-map=/project/scipy-src=. -fmacro-prefix-map=/project/scipy-src/build-reference=./build"
+            CXXFLAGS="$CXXFLAGS -fcanon-prefix-map -fmacro-prefix-map=/project/scipy-src=. -fmacro-prefix-map=/project/scipy-src/build-reference=./build"
         with:
            package-dir: scipy-src
            output-dir: dist
@@ -310,6 +314,8 @@ jobs:
             SCIPY_BUILD_VENV=/tmp/scipy-reproducibility-build-venv
             SCIPY_CYTHON_SOURCE=/project/cython-src
             PATH=/tmp/scipy-reproducibility-build-venv/bin:$PATH
+            CFLAGS="$CFLAGS -fcanon-prefix-map -fmacro-prefix-map=/project/scipy-src=. -fmacro-prefix-map=/project/scipy-src/build-rebuilt/nested/builddir=./build"
+            CXXFLAGS="$CXXFLAGS -fcanon-prefix-map -fmacro-prefix-map=/project/scipy-src=. -fmacro-prefix-map=/project/scipy-src/build-rebuilt/nested/builddir=./build"
         with:
           package-dir: scipy-src
           output-dir: rebuilt
