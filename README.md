@@ -44,8 +44,16 @@ them before any wheels are built - see `CONTRIBUTING.md` for how to regenerate
 it.
 
 Linux wheels are the closest to reproducible, because the build containers are
-pinned as well, by `cibuildwheel`. What we still need to do is actually verify
-build reproducibility in a systematic way.
+pinned as well, by `cibuildwheel`. CI checks the current state by rebuilding the
+CPython 3.15 free-threaded manylinux x86-64 wheel on an Ubuntu 22.04 runner and
+comparing it with the wheel from the main Ubuntu 24.04 build matrix using
+`diffoscope`. Both builds use the same resolved `scipy` commit. A difference
+fails the check and produces text and HTML reports as a workflow artifact.
+
+`SOURCE_DATE_EPOCH` is set to the resolved `scipy` commit timestamp for wheel
+and sdist builds. This normalizes timestamps while ensuring that artifacts made
+from different source commits retain a meaningful source-derived date. Reports
+from the reproducibility check are used to identify further improvements.
 
 Windows and macOS wheels aren't reproducible yet, because the runner images
 that GitHub Actions provides aren't pinned and may change over time.
