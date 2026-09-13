@@ -1,10 +1,11 @@
 name: Publish sdist and wheels
 
 env:
-  # A tag or branch name or a commit hash for the scipy/scipy repo, for which
+  # A tag or branch name or a commit hash for the SciPy source repo, for which
   # to build wheels. This is normally set to `main` in the main branch of this
   # repo, and to a tag name (e.g., `v2.3.2`) on a release branch.
-  SOURCE_REF_TO_BUILD: main
+  # DEBUG: rgommers/scipy branch pyduccfft-reproducible.
+  SOURCE_REF_TO_BUILD: 5063c529cef23e9406713d35306e55702725ded7
   UV_VERSION: "0.12.5"
   # Pinned commit from the temporary rgommers/cython build-repro integration branch.
   CYTHON_REPRO_SHA: d2c574364aa77e307ed8a0d1f0b337e7c947da75
@@ -58,7 +59,7 @@ jobs:
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: scipy/scipy
+          repository: rgommers/scipy
           ref: ${{ env.SOURCE_REF_TO_BUILD }}
           path: scipy-src
           persist-credentials: false
@@ -131,7 +132,7 @@ jobs:
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: scipy/scipy
+          repository: rgommers/scipy
           ref: ${{ needs.check_lock.outputs.scipy_sha }}
           path: scipy-src
           submodules: true
@@ -217,7 +218,7 @@ jobs:
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: scipy/scipy
+          repository: rgommers/scipy
           ref: ${{ needs.check_lock.outputs.scipy_sha }}
           path: scipy-src
           submodules: true
@@ -318,7 +319,7 @@ jobs:
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: scipy/scipy
+          repository: rgommers/scipy
           ref: ${{ needs.check_lock.outputs.scipy_sha }}
           path: scipy-src
           submodules: true
@@ -473,7 +474,7 @@ jobs:
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: scipy/scipy
+          repository: rgommers/scipy
           ref: ${{ needs.check_lock.outputs.scipy_sha }}
           path: scipy-src
           submodules: true
@@ -580,7 +581,7 @@ jobs:
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: scipy/scipy
+          repository: rgommers/scipy
           ref: ${{ needs.check_lock.outputs.scipy_sha }}
           path: scipy-src
           fetch-depth: 0
