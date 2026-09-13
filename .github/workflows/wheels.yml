@@ -1,11 +1,14 @@
 name: Publish sdist and wheels
 
 env:
-  # A tag or branch name or a commit hash for the scipy/scipy repo, for which
+  # A tag or branch name or a commit hash for the SciPy source repo, for which
   # to build wheels. This is normally set to `main` in the main branch of this
   # repo, and to a tag name (e.g., `v2.3.2`) on a release branch.
-  SOURCE_REF_TO_BUILD: main
+  # DEBUG: rgommers/scipy branch pyduccfft-reproducible.
+  SOURCE_REF_TO_BUILD: 5063c529cef23e9406713d35306e55702725ded7
   UV_VERSION: "0.12.5"
+  # Pinned commit from the temporary rgommers/cython build-repro integration branch.
+  CYTHON_REPRO_SHA: d2c574364aa77e307ed8a0d1f0b337e7c947da75
 
 on:
   schedule:
@@ -23,6 +26,7 @@ on:
   push:
     branches:
       - main  # FOR TESTING ONLY
+      - reproducible-builds
   workflow_dispatch:
     inputs:
       environment:
@@ -42,7 +46,9 @@ jobs:
   check_lock:
     name: Check uv.lock file
     runs-on: ubuntu-latest
-    if: (github.repository == 'scipy/scipy-release' || github.repository == '')
+    outputs:
+      scipy_sha: ${{ steps.scipy_ref.outputs.sha }}
+      source_date_epoch: ${{ steps.scipy_ref.outputs.source_date_epoch }}
 
     steps:
       - name: Checkout scipy-release
@@ -53,10 +59,16 @@ jobs:
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: scipy/scipy
+          repository: rgommers/scipy
           ref: ${{ env.SOURCE_REF_TO_BUILD }}
           path: scipy-src
           persist-credentials: false
+
+      - name: Resolve scipy source ref
+        id: scipy_ref
+        run: |
+          echo "sha=$(git -C scipy-src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "source_date_epoch=$(git -C scipy-src log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
 
       - name: Install uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -90,8 +102,12 @@ jobs:
   build_wheels:
     name: BLD > ${{ matrix.python }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}-${{ matrix.buildplat[3] }}
     runs-on: ${{ matrix.buildplat[0] }}
-    if: (github.repository == 'scipy/scipy-release' || github.repository == '')
     needs: [check_lock]
+    env:
+      # Use the source commit time for timestamps in build artifacts. cibuildwheel
+      # automatically passes this variable into its Linux build containers.
+      SOURCE_DATE_EPOCH: ${{ needs.check_lock.outputs.source_date_epoch }}
+      CIBW_CONFIG_SETTINGS: "build-dir={package}/build-reference"
     strategy:
       # Ensure that a wheel builder finishes even if another fails
       fail-fast: false
@@ -103,16 +119,9 @@ jobs:
         # [windows-2025, win*, "AMD64 x86"]. However, those two require a different compiler setup
         # so easier to separate out here.
         - [ubuntu-24.04, manylinux, x86_64, "", ""]
-        - [ubuntu-24.04, musllinux, x86_64, "", ""]
-        - [ubuntu-24.04-arm, manylinux, aarch64, "", ""]
-        - [ubuntu-24.04-arm, musllinux, aarch64, "", ""]
-        - [macos-15-intel, macosx, x86_64, openblas, "10.15"]
-        - [macos-15-intel, macosx, x86_64, accelerate, "14.0"]
-        - [macos-14, macosx, arm64, openblas, "12.3"]
-        - [macos-14, macosx, arm64, accelerate, "14.0"]
         - [windows-2025, win, AMD64, "", ""]
-        - [windows-11-arm, win, ARM64, "", ""]
-        python: ["cp312", "cp313", "cp314", "cp314t", "cp315", "cp315t"]
+        - [macos-15, macosx, arm64, openblas, "12.3"]
+        python: ["cp315t"]
 
     steps:
       - name: Checkout scipy-release
@@ -123,10 +132,18 @@ jobs:
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: scipy/scipy
-          ref: ${{ env.SOURCE_REF_TO_BUILD }}
+          repository: rgommers/scipy
+          ref: ${{ needs.check_lock.outputs.scipy_sha }}
           path: scipy-src
           submodules: true
+          persist-credentials: false
+
+      - name: Checkout patched Cython
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rgommers/cython
+          ref: ${{ env.CYTHON_REPRO_SHA }}
+          path: cython-src
           persist-credentials: false
 
       # the version of python we'll run cibuildwheel with
@@ -147,39 +164,17 @@ jobs:
 
       - name: Setup windows
         if: matrix.buildplat[1] == 'win'
-        run: |
-          echo "CC=clang-cl" >> $env:GITHUB_ENV
-          echo "CXX=clang-cl" >> $env:GITHUB_ENV
-          echo "TARGET_ARCH=${{ matrix.buildplat[2] }}" >> $env:GITHUB_ENV
-
-          # workaround for https://github.com/scipy/scipy/issues/25067
-          rm -fo c:/Strawberry/c/lib/pkgconfig/*.pc
-
-          # pkg-config setup
-          $CIBW = "${{ github.workspace }}/.openblas"
-          # pkgconfig needs a complete path, and not just "./openblas since the
-          # build is run in a tmp dir (?)
-          # It seems somewhere in the env passing, `\` is not
-          # passed through, so convert it to '/'
-          $CIBW = $CIBW.replace("\","/")
-          echo "CIBW_ENVIRONMENT_WINDOWS=PKG_CONFIG_PATH=$CIBW" >> $env:GITHUB_ENV
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.buildplat[2] }}
+        run: bash tools/wheels/setup_windows.sh
 
       - name: Setup macOS
         if: startsWith( matrix.buildplat[0], 'macos-' )
         env:
           BLAS_VARIANT: ${{ matrix.buildplat[3] }}
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.buildplat[4] }}
-        run: |
-          if [[ "${BLAS_VARIANT}" == "accelerate" ]]; then
-            echo CIBW_CONFIG_SETTINGS=\"setup-args=-Dblas=accelerate\" >> "$GITHUB_ENV"
-
-            # Builds with Accelerate only target macOS>=14.0
-            CIBW_ENV="CIBW_ENVIRONMENT_MACOS=MACOSX_DEPLOYMENT_TARGET=14.0 INSTALL_OPENBLAS=false"
-          else
-            CIBW_ENV="CIBW_ENVIRONMENT_MACOS=PKG_CONFIG_PATH=$PWD/.openblas \
-              MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET}""
-          fi
-          echo "$CIBW_ENV" >> "$GITHUB_ENV"
+        run: bash tools/wheels/setup_macos.sh
 
       - name: Build wheels
         uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074 # v4.2.0
@@ -187,6 +182,15 @@ jobs:
           CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}*
           CIBW_ARCHS: ${{ matrix.buildplat[2] }}
           CIBW_ENABLE: cpython-prerelease
+          # Canonicalize relative __FILE__ paths before mapping source and build
+          # roots. The last (more specific) mapping takes precedence in GCC.
+          CIBW_ENVIRONMENT_LINUX: >-
+            RUNNER_OS=Linux
+            PKG_CONFIG_PATH=/project/.openblas
+            LIBRARY_PATH=/project/.openblas/lib
+            SCIPY_CYTHON_SOURCE=/project/cython-src
+            CFLAGS="$CFLAGS -fcanon-prefix-map -fmacro-prefix-map=/project/scipy-src=. -fmacro-prefix-map=/project/scipy-src/build-reference=./build"
+            CXXFLAGS="$CXXFLAGS -fcanon-prefix-map -fmacro-prefix-map=/project/scipy-src=. -fmacro-prefix-map=/project/scipy-src/build-reference=./build"
         with:
            package-dir: scipy-src
            output-dir: dist
@@ -196,6 +200,239 @@ jobs:
         with:
           path: ./dist/*.whl
           name: ${{ matrix.python }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}-${{ matrix.buildplat[3] }}-${{ matrix.buildplat[4] }}
+
+# -------------------------------------------------------------------------------------
+  check_reproducibility:
+    name: Check cp315t manylinux x86_64 reproducibility
+    runs-on: ubuntu-22.04
+    needs: [check_lock, build_wheels]
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.check_lock.outputs.source_date_epoch }}
+
+    steps:
+      - name: Checkout scipy-release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout scipy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rgommers/scipy
+          ref: ${{ needs.check_lock.outputs.scipy_sha }}
+          path: scipy-src
+          submodules: true
+          persist-credentials: false
+
+      - name: Checkout patched Cython
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rgommers/cython
+          ref: ${{ env.CYTHON_REPRO_SHA }}
+          path: cython-src
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: 3.13
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
+          enable-cache: false
+
+      - name: Download reference wheel
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cp315t-manylinux-x86_64--
+          path: reference
+
+      - name: Rebuild wheel
+        uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074 # v4.2.0
+        env:
+          CIBW_BUILD: cp315t-manylinux*
+          CIBW_ARCHS: x86_64
+          CIBW_ENABLE: cpython-prerelease
+          # Vary directory depth to expose relative source paths embedded by __FILE__.
+          CIBW_CONFIG_SETTINGS_LINUX: "build-dir={package}/build-rebuilt/nested/builddir"
+          # Build dependencies normally live in cibuildwheel's /opt/python prefix.
+          # Deliberately use another prefix here so the comparison also detects
+          # build-environment paths leaking into the wheel.
+          CIBW_ENVIRONMENT_LINUX: >-
+            RUNNER_OS=Linux
+            PKG_CONFIG_PATH=/project/.openblas
+            LIBRARY_PATH=/project/.openblas/lib
+            SCIPY_BUILD_VENV=/tmp/scipy-reproducibility-build-venv
+            SCIPY_CYTHON_SOURCE=/project/cython-src
+            PATH=/tmp/scipy-reproducibility-build-venv/bin:$PATH
+            CFLAGS="$CFLAGS -fcanon-prefix-map -fmacro-prefix-map=/project/scipy-src=. -fmacro-prefix-map=/project/scipy-src/build-rebuilt/nested/builddir=./build"
+            CXXFLAGS="$CXXFLAGS -fcanon-prefix-map -fmacro-prefix-map=/project/scipy-src=. -fmacro-prefix-map=/project/scipy-src/build-rebuilt/nested/builddir=./build"
+        with:
+          package-dir: scipy-src
+          output-dir: rebuilt
+          config-file: cibuildwheel.toml
+
+      - name: Install diffoscope
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends diffoscope-minimal=205
+
+      - name: Compare wheels
+        id: compare
+        run: bash tools/wheels/compare_wheels.sh 'cp315t manylinux x86_64'
+
+      - name: Upload diffoscope report
+        if: ${{ failure() && steps.compare.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reproducibility-report-cp315t-manylinux-x86_64
+          path: diffoscope.*
+          if-no-files-found: ignore
+          retention-days: 14
+
+# -------------------------------------------------------------------------------------
+  rebuild_native_wheels:
+    name: Rebuild cp315t ${{ matrix.buildplat[1] }} ${{ matrix.buildplat[2] }}
+    runs-on: ${{ matrix.buildplat[0] }}
+    needs: [check_lock, build_wheels]
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.check_lock.outputs.source_date_epoch }}
+      # Vary the build-directory depth to expose embedded relative paths.
+      # Native cibuildwheel builds already use randomly named build venvs.
+      CIBW_CONFIG_SETTINGS: "build-dir={package}/build-rebuilt/nested/builddir"
+    strategy:
+      fail-fast: false
+      matrix:
+        # Match the reference runner images to avoid toolchain-version differences.
+        buildplat:
+        - [windows-2025, win, AMD64, "", ""]
+        - [macos-15, macosx, arm64, openblas, "12.3"]
+
+    steps:
+      - name: Checkout scipy-release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout scipy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rgommers/scipy
+          ref: ${{ needs.check_lock.outputs.scipy_sha }}
+          path: scipy-src
+          submodules: true
+          persist-credentials: false
+
+      - name: Checkout patched Cython
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rgommers/cython
+          ref: ${{ env.CYTHON_REPRO_SHA }}
+          path: cython-src
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: 3.13
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+
+      - name: Setup windows
+        if: matrix.buildplat[1] == 'win'
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.buildplat[2] }}
+        run: bash tools/wheels/setup_windows.sh
+
+      - name: Setup macOS
+        if: matrix.buildplat[1] == 'macosx'
+        env:
+          BLAS_VARIANT: ${{ matrix.buildplat[3] }}
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.buildplat[4] }}
+        run: bash tools/wheels/setup_macos.sh
+
+      - name: Rebuild wheel
+        uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074 # v4.2.0
+        env:
+          CIBW_BUILD: cp315t-${{ matrix.buildplat[1] }}*
+          CIBW_ARCHS: ${{ matrix.buildplat[2] }}
+          CIBW_ENABLE: cpython-prerelease
+        with:
+          package-dir: scipy-src
+          output-dir: rebuilt
+          config-file: cibuildwheel.toml
+
+      # diffoscope runs on Ubuntu for both platforms. Use a run-scoped cache so
+      # rebuilt wheels cannot enter the release jobs' artifact downloads.
+      - name: Save rebuilt wheel for comparison
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: rebuilt
+          key: rebuilt-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}-${{ github.run_id }}-${{ github.run_attempt }}
+          enableCrossOsArchive: true
+
+  check_native_reproducibility:
+    name: Check cp315t ${{ matrix.platform }} reproducibility
+    runs-on: ubuntu-22.04
+    needs: [rebuild_native_wheels]
+    # Compare a successful rebuild even if the other platform failed to build.
+    if: ${{ !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: win-AMD64
+            artifact: cp315t-win-AMD64--
+          - platform: macosx-arm64
+            artifact: cp315t-macosx-arm64-openblas-12.3
+
+    steps:
+      - name: Checkout scipy-release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download reference wheel
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: reference
+
+      - name: Restore rebuilt wheel
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: rebuilt
+          key: rebuilt-${{ matrix.platform }}-${{ github.run_id }}-${{ github.run_attempt }}
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
+
+      - name: Install diffoscope and binary inspection tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends diffoscope-minimal=205 unzip binutils llvm-14
+          # Mach-O comparison uses llvm-readobj and llvm-objdump on Linux.
+          echo /usr/lib/llvm-14/bin >> "$GITHUB_PATH"
+
+      - name: Compare wheels
+        id: compare
+        env:
+          REPRO_PLATFORM: ${{ matrix.platform }}
+        run: bash tools/wheels/compare_wheels.sh "cp315t $REPRO_PLATFORM"
+
+      - name: Upload diffoscope report
+        if: ${{ failure() && steps.compare.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reproducibility-report-cp315t-${{ matrix.platform }}
+          path: diffoscope.*
+          if-no-files-found: ignore
+          retention-days: 14
 
 # -------------------------------------------------------------------------------------
   # Should we upload to nightly. We do this on a scheduled run, or a workflow dispatch with environment 'none'
@@ -226,6 +463,7 @@ jobs:
     needs: [check_lock]
     env:
       OPENBLAS: openblas32
+      SOURCE_DATE_EPOCH: ${{ needs.check_lock.outputs.source_date_epoch }}
 
     steps:
       - name: Checkout scipy-release
@@ -236,8 +474,8 @@ jobs:
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: scipy/scipy
-          ref: ${{ env.SOURCE_REF_TO_BUILD }}
+          repository: rgommers/scipy
+          ref: ${{ needs.check_lock.outputs.scipy_sha }}
           path: scipy-src
           submodules: true
           persist-credentials: false
@@ -337,14 +575,14 @@ jobs:
     name: Ensure commit is tag before upload to PyPi
 
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'pypi'
-    needs: [build_wheels, build_sdist]
+    needs: [check_lock, build_wheels, build_sdist]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout scipy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: scipy/scipy
-          ref: ${{ env.SOURCE_REF_TO_BUILD }}
+          repository: rgommers/scipy
+          ref: ${{ needs.check_lock.outputs.scipy_sha }}
           path: scipy-src
           fetch-depth: 0
           fetch-tags: true
