@@ -63,13 +63,15 @@ if [[ "$INSTALL_OPENBLAS" = "true" ]] ; then
     mkdir -p $pkgconf_path
     "$PYTHON_EXE" -c "import scipy_openblas32; print(scipy_openblas32.get_pkg_config())" > $pkgconf_path/scipy-openblas.pc
 
-    if [[ "$RUNNER_OS" == "Linux" ]]; then
+    if [[ "$RUNNER_OS" == "Linux" || "$RUNNER_OS" == "macOS" ]]; then
         # Avoid making Meson add scipy-openblas's absolute path to the build RPATH.
         # FIXME: Support this directly in scipy-openblas's get_pkg_config().
         OPENBLAS_DIR=$("$PYTHON_EXE" -c "import scipy_openblas32; print(scipy_openblas32.get_lib_dir())")
         OPENBLAS_LIBRARY=$("$PYTHON_EXE" -c "import scipy_openblas32; print(scipy_openblas32.get_library())")
         ln -s "$OPENBLAS_DIR" "$pkgconf_path/lib"
-        sed -i "s|^Libs: .*|Libs: -l$OPENBLAS_LIBRARY|" "$pkgconf_path/scipy-openblas.pc"
+        # The backup suffix works with both GNU and BSD sed.
+        sed -i.bak "s|^Libs: .*|Libs: -l$OPENBLAS_LIBRARY|" "$pkgconf_path/scipy-openblas.pc"
+        rm "$pkgconf_path/scipy-openblas.pc.bak"
         if ! grep -Fqx "Libs: -l$OPENBLAS_LIBRARY" "$pkgconf_path/scipy-openblas.pc"; then
             echo "Failed to remove the OpenBLAS library path from Libs" >&2
             exit 1
