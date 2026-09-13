@@ -7,7 +7,7 @@ env:
   SOURCE_REF_TO_BUILD: main
   UV_VERSION: "0.12.5"
   # Pinned commit from the temporary rgommers/cython build-repro integration branch.
-  CYTHON_REPRO_SHA: a90baf1ec667c8b5fe3022bac8923ad850205bdd
+  CYTHON_REPRO_SHA: d2c574364aa77e307ed8a0d1f0b337e7c947da75
 
 on:
   schedule:
