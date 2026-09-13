@@ -106,6 +106,7 @@ jobs:
       # Use the source commit time for timestamps in build artifacts. cibuildwheel
       # automatically passes this variable into its Linux build containers.
       SOURCE_DATE_EPOCH: ${{ needs.check_lock.outputs.source_date_epoch }}
+      CIBW_CONFIG_SETTINGS: "build-dir={package}/build-reference"
     strategy:
       # Ensure that a wheel builder finishes even if another fails
       fail-fast: false
@@ -117,6 +118,8 @@ jobs:
         # [windows-2025, win*, "AMD64 x86"]. However, those two require a different compiler setup
         # so easier to separate out here.
         - [ubuntu-24.04, manylinux, x86_64, "", ""]
+        - [windows-2025, win, AMD64, "", ""]
+        - [macos-15, macosx, arm64, openblas, "12.3"]
         python: ["cp315t"]
 
     steps:
@@ -160,39 +163,17 @@ jobs:
 
       - name: Setup windows
         if: matrix.buildplat[1] == 'win'
-        run: |
-          echo "CC=clang-cl" >> $env:GITHUB_ENV
-          echo "CXX=clang-cl" >> $env:GITHUB_ENV
-          echo "TARGET_ARCH=${{ matrix.buildplat[2] }}" >> $env:GITHUB_ENV
-
-          # workaround for https://github.com/scipy/scipy/issues/25067
-          rm -fo c:/Strawberry/c/lib/pkgconfig/*.pc
-
-          # pkg-config setup
-          $CIBW = "${{ github.workspace }}/.openblas"
-          # pkgconfig needs a complete path, and not just "./openblas since the
-          # build is run in a tmp dir (?)
-          # It seems somewhere in the env passing, `\` is not
-          # passed through, so convert it to '/'
-          $CIBW = $CIBW.replace("\","/")
-          echo "CIBW_ENVIRONMENT_WINDOWS=PKG_CONFIG_PATH=$CIBW" >> $env:GITHUB_ENV
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.buildplat[2] }}
+        run: bash tools/wheels/setup_windows.sh
 
       - name: Setup macOS
         if: startsWith( matrix.buildplat[0], 'macos-' )
         env:
           BLAS_VARIANT: ${{ matrix.buildplat[3] }}
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.buildplat[4] }}
-        run: |
-          if [[ "${BLAS_VARIANT}" == "accelerate" ]]; then
-            echo CIBW_CONFIG_SETTINGS=\"setup-args=-Dblas=accelerate\" >> "$GITHUB_ENV"
-
-            # Builds with Accelerate only target macOS>=14.0
-            CIBW_ENV="CIBW_ENVIRONMENT_MACOS=MACOSX_DEPLOYMENT_TARGET=14.0 INSTALL_OPENBLAS=false"
-          else
-            CIBW_ENV="CIBW_ENVIRONMENT_MACOS=PKG_CONFIG_PATH=$PWD/.openblas \
-              MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET}""
-          fi
-          echo "$CIBW_ENV" >> "$GITHUB_ENV"
+        run: bash tools/wheels/setup_macos.sh
 
       - name: Build wheels
         uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074 # v4.2.0
@@ -273,6 +254,8 @@ jobs:
           CIBW_BUILD: cp315t-manylinux*
           CIBW_ARCHS: x86_64
           CIBW_ENABLE: cpython-prerelease
+          # Vary directory depth to expose relative source paths embedded by __FILE__.
+          CIBW_CONFIG_SETTINGS_LINUX: "build-dir={package}/build-rebuilt/nested/builddir"
           # Build dependencies normally live in cibuildwheel's /opt/python prefix.
           # Deliberately use another prefix here so the comparison also detects
           # build-environment paths leaking into the wheel.
@@ -297,47 +280,155 @@ jobs:
 
       - name: Compare wheels
         id: compare
-        run: |
-          shopt -s nullglob
-          reference_wheels=(reference/*.whl)
-          rebuilt_wheels=(rebuilt/*.whl)
-
-          if (( ${#reference_wheels[@]} != 1 )); then
-            echo "Expected exactly one reference wheel, found ${#reference_wheels[@]}" >&2
-            exit 2
-          fi
-          if (( ${#rebuilt_wheels[@]} != 1 )); then
-            echo "Expected exactly one rebuilt wheel, found ${#rebuilt_wheels[@]}" >&2
-            exit 2
-          fi
-
-          {
-            echo '## cp315t manylinux x86_64 reproducibility'
-            echo '```'
-            sha256sum "${reference_wheels[0]}" "${rebuilt_wheels[0]}"
-            echo '```'
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-
-          set +e
-          diffoscope \
-            --text diffoscope.txt \
-            --html diffoscope.html \
-            "${reference_wheels[0]}" "${rebuilt_wheels[0]}"
-          status=$?
-          set -e
-
-          if (( status != 0 )) && [[ -f diffoscope.txt ]]; then
-            # Keep the log useful without flooding it; the complete reports are
-            # uploaded by the next step.
-            sed -n '1,1000p' diffoscope.txt
-          fi
-          exit "$status"
+        run: bash tools/wheels/compare_wheels.sh 'cp315t manylinux x86_64'
 
       - name: Upload diffoscope report
         if: ${{ failure() && steps.compare.outcome == 'failure' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: reproducibility-report-cp315t-manylinux-x86_64
+          path: diffoscope.*
+          if-no-files-found: ignore
+          retention-days: 14
+
+# -------------------------------------------------------------------------------------
+  rebuild_native_wheels:
+    name: Rebuild cp315t ${{ matrix.buildplat[1] }} ${{ matrix.buildplat[2] }}
+    runs-on: ${{ matrix.buildplat[0] }}
+    needs: [check_lock, build_wheels]
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.check_lock.outputs.source_date_epoch }}
+      # Vary the build-directory depth to expose embedded relative paths.
+      # Native cibuildwheel builds already use randomly named build venvs.
+      CIBW_CONFIG_SETTINGS: "build-dir={package}/build-rebuilt/nested/builddir"
+    strategy:
+      fail-fast: false
+      matrix:
+        # Match the reference runner images to avoid toolchain-version differences.
+        buildplat:
+        - [windows-2025, win, AMD64, "", ""]
+        - [macos-15, macosx, arm64, openblas, "12.3"]
+
+    steps:
+      - name: Checkout scipy-release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout scipy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: scipy/scipy
+          ref: ${{ needs.check_lock.outputs.scipy_sha }}
+          path: scipy-src
+          submodules: true
+          persist-credentials: false
+
+      - name: Checkout patched Cython
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rgommers/cython
+          ref: ${{ env.CYTHON_REPRO_SHA }}
+          path: cython-src
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: 3.13
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+
+      - name: Setup windows
+        if: matrix.buildplat[1] == 'win'
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.buildplat[2] }}
+        run: bash tools/wheels/setup_windows.sh
+
+      - name: Setup macOS
+        if: matrix.buildplat[1] == 'macosx'
+        env:
+          BLAS_VARIANT: ${{ matrix.buildplat[3] }}
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.buildplat[4] }}
+        run: bash tools/wheels/setup_macos.sh
+
+      - name: Rebuild wheel
+        uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074 # v4.2.0
+        env:
+          CIBW_BUILD: cp315t-${{ matrix.buildplat[1] }}*
+          CIBW_ARCHS: ${{ matrix.buildplat[2] }}
+          CIBW_ENABLE: cpython-prerelease
+        with:
+          package-dir: scipy-src
+          output-dir: rebuilt
+          config-file: cibuildwheel.toml
+
+      # diffoscope runs on Ubuntu for both platforms. Use a run-scoped cache so
+      # rebuilt wheels cannot enter the release jobs' artifact downloads.
+      - name: Save rebuilt wheel for comparison
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: rebuilt
+          key: rebuilt-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}-${{ github.run_id }}-${{ github.run_attempt }}
+          enableCrossOsArchive: true
+
+  check_native_reproducibility:
+    name: Check cp315t ${{ matrix.platform }} reproducibility
+    runs-on: ubuntu-22.04
+    needs: [rebuild_native_wheels]
+    # Compare a successful rebuild even if the other platform failed to build.
+    if: ${{ !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: win-AMD64
+            artifact: cp315t-win-AMD64--
+          - platform: macosx-arm64
+            artifact: cp315t-macosx-arm64-openblas-12.3
+
+    steps:
+      - name: Checkout scipy-release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download reference wheel
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: reference
+
+      - name: Restore rebuilt wheel
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: rebuilt
+          key: rebuilt-${{ matrix.platform }}-${{ github.run_id }}-${{ github.run_attempt }}
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
+
+      - name: Install diffoscope and binary inspection tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends diffoscope-minimal=205 unzip binutils llvm-14
+          # Mach-O comparison uses llvm-readobj and llvm-objdump on Linux.
+          echo /usr/lib/llvm-14/bin >> "$GITHUB_PATH"
+
+      - name: Compare wheels
+        id: compare
+        env:
+          REPRO_PLATFORM: ${{ matrix.platform }}
+        run: bash tools/wheels/compare_wheels.sh "cp315t $REPRO_PLATFORM"
+
+      - name: Upload diffoscope report
+        if: ${{ failure() && steps.compare.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reproducibility-report-cp315t-${{ matrix.platform }}
           path: diffoscope.*
           if-no-files-found: ignore
           retention-days: 14
